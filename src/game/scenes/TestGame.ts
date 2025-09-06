@@ -85,10 +85,12 @@ export class TestGame extends Phaser.Scene {
                 }
             }
             if (found) {
-                const [newX, newY] = coordinates[closestI][closestJ];
-                setCarPosition(newX, newY);
-                // Optionally log for debug
-                console.log(`Moved car to: [${closestI},${closestJ}]`, [newX, newY], 'Topography:', topography[closestI][closestJ]);
+                const topo = topography[closestI][closestJ];
+                if (topo != 1 && topo != 2) {
+                    const [newX, newY] = coordinates[closestI][closestJ];
+                    setCarPosition(newX, newY);
+                    console.log(`Moved car to: [${closestI},${closestJ}]`, [newX, newY], 'Topography:', topo);
+                }
             }
         });
         // --- End click-to-move feature ---
