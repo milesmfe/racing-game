@@ -93,9 +93,6 @@ export class TestGame extends Phaser.Scene {
         });
         // --- End click-to-move feature ---
 
-        console.log("Car Position Coordinates:", positionCoords);
-        console.log("Car Position Topography:", topography[21][5]);
-
         // Notify that the scene is ready
         EventBus.emit('current-scene-ready', this);
     }
