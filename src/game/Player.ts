@@ -1,9 +1,9 @@
 export class Player {
     id: number;
-    currentPosition: { x: number, y: number };
+    currentPosition: { i: number, j: number };
 
     constructor(id: number, startPosition: [number, number]) {
         this.id = id;
-        this.currentPosition = { x: startPosition[0], y: startPosition[1] };
+        this.currentPosition = { i: startPosition[0], j: startPosition[1] };
     }
 }

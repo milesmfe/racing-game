@@ -126,7 +126,7 @@ export class TestGame extends Phaser.Scene {
          * Returns the player id occupying the given (i, j) space, or null if unoccupied.
          */
         const getOccupyingPlayerId = (i: number, j: number): number | null => {
-            const player = players.find(player => player.currentPosition.x === i && player.currentPosition.y === j);
+            const player = players.find(player => player.currentPosition.i === i && player.currentPosition.j === j);
             return player ? player.id : null;
         };
 
@@ -134,24 +134,24 @@ export class TestGame extends Phaser.Scene {
          * Moves the player sprite to the specified (i, j) position in the coordinate matrix.
          * Updates heading to point toward the next space in the row.
          */
-        const movePlayerTo = (playerId: number, position: { x: number, y: number }) => {
+        const movePlayerTo = (playerId: number, position: { i: number, j: number }) => {
             const player = players.find(p => p.id === playerId);
             if (!player) return;
 
-            const spaceOccupiedBy = getOccupyingPlayerId(position.x, position.y);
+            const spaceOccupiedBy = getOccupyingPlayerId(position.i, position.j);
             if (spaceOccupiedBy !== null && spaceOccupiedBy != playerId) return;
 
-            player.currentPosition = { x: position.x, y: position.y };
+            player.currentPosition = { i: position.i, j: position.j };
 
             const sprite = playerSprites[playerId];
             if (!sprite) return;
-            const coords = getCoordinates(position.x, position.y);
+            const coords = getCoordinates(position.i, position.j);
             if (!coords) return;
             const pos = trackImageToContainer(coords.x, coords.y);
             sprite.setPosition(pos.x, pos.y);
 
-            const nextJ = (position.y + 1) % coordinates[position.x].length;
-            const nextCoords = getCoordinates(position.x, nextJ);
+            const nextJ = (position.j + 1) % coordinates[position.i].length;
+            const nextCoords = getCoordinates(position.i, nextJ);
             if (nextCoords) {
                 const carX = coords.x;
                 const carY = coords.y;
@@ -202,7 +202,7 @@ export class TestGame extends Phaser.Scene {
             if (closest) {
                 const topo = getTopography(closest.i, closest.j);
                 if (topo !== 1 && topo !== 2) {
-                    movePlayerTo(currentTurn, { x: closest.i, y: closest.j });
+                    movePlayerTo(currentTurn, { i: closest.i, j: closest.j });
                     currentTurn++;
                     if (currentTurn === players.length) {
                         currentTurn = 0;
