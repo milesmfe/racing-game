@@ -1,6 +1,6 @@
 import Phaser from "phaser";
 import { EventBus } from "../EventBus";
-import { TrackData } from "../TrackData";
+import { TrackData, TrackSpaceType } from "../TrackData";
 import { Player } from "../Player";
 
 export class TestGame extends Phaser.Scene {
@@ -98,6 +98,7 @@ export class TestGame extends Phaser.Scene {
                 }
             }
             if (closestI === -1 || closestJ === -1) return null;
+            if (closestDist > 100) return null;
             return { i: closestI, j: closestJ, dist: closestDist };
         };
 
@@ -196,13 +197,53 @@ export class TestGame extends Phaser.Scene {
         container.add(button);
 
         let currentTurn = 0;
+        let selectedSpaces: { i: number, j: number }[] = [];
+        let selectedHighlightCircles: Phaser.GameObjects.Arc[] = [];
+        let highlighted: { i: number, j: number } | null = null;
+        let highlightCircle: Phaser.GameObjects.Arc | null = null;
 
-        this.input.on('pointerdown', (pointer: Phaser.Input.Pointer) => {
+        this.input.on('pointermove', (pointer: Phaser.Input.Pointer) => {
             const closest = findNearestValidSpace({ x: pointer.x, y: pointer.y });
             if (closest) {
                 const topo = getTopography(closest.i, closest.j);
-                if (topo !== 1 && topo !== 2) {
-                    movePlayerTo(currentTurn, { i: closest.i, j: closest.j });
+                if (topo === TrackSpaceType.INVISIBLE_SPACE || topo === TrackSpaceType.OUT_OF_BOUNDS || topo === TrackSpaceType.SPIN_OFF_ZONE) return;
+                if (highlighted === closest || selectedSpaces.includes(closest)) return;
+                highlightCircle?.destroy();
+                highlighted = closest;
+                const coords = getCoordinates(highlighted.i, highlighted.j);
+                if (coords) {
+                    const pos = trackImageToContainer(coords.x, coords.y);
+                    highlightCircle = this.add.circle(pos.x, pos.y, 15, 0xffff00, 0.5);
+                    container.add(highlightCircle);
+                    highlightCircle.setDepth(1000);
+
+                }
+            } else {
+                highlightCircle?.destroy();
+                highlightCircle = null;
+            }
+
+        });
+
+        this.input.on('pointerdown', (pointer: Phaser.Input.Pointer) => {
+            const closest = findNearestValidSpace({ x: pointer.x, y: pointer.y });
+            if (closest && !selectedSpaces.includes(closest)) {
+                const topo = getTopography(closest.i, closest.j);
+                if (topo === TrackSpaceType.INVISIBLE_SPACE || topo === TrackSpaceType.OUT_OF_BOUNDS || topo === TrackSpaceType.SPIN_OFF_ZONE) return;
+                if (selectedHighlightCircles.length !== players[currentTurn].currentSpeed / 20) {
+                    const coords = getCoordinates(closest.i, closest.j);
+                    if (!coords) return;
+                    const pos = trackImageToContainer(coords.x, coords.y);
+                    const toHighlight = this.add.circle(pos.x, pos.y, 15, 0x00ff00, 0.5);
+                    container.add(toHighlight);
+                    toHighlight.setDepth(1000);
+                    selectedSpaces.push(closest);
+                    selectedHighlightCircles.push(toHighlight);
+                } else {
+                    movePlayerTo(currentTurn, selectedSpaces[selectedSpaces.length - 1]);
+                    selectedSpaces = [];
+                    selectedHighlightCircles.forEach(circle => circle.destroy());
+                    selectedHighlightCircles = [];
                     currentTurn++;
                     if (currentTurn === players.length) {
                         currentTurn = 0;
