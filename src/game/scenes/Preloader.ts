@@ -24,6 +24,7 @@ export class Preloader extends Scene
         this.load.image('green-car', 'assets/car-green.png');
         this.load.image('yellow-car', 'assets/car-yellow.png');
         this.load.image('orange-car', 'assets/car-orange.png');
+        this.load.image('gray-car', 'assets/car-gray.png');
 
         // Display loading progress
         const width = this.cameras.main.width;
