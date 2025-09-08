@@ -461,18 +461,11 @@ export class TestGame extends Phaser.Scene {
             topo == null || topo === TrackSpaceType.OUT_OF_BOUNDS || topo === TrackSpaceType.SPIN_OFF_ZONE;
 
         for (const dir of directions) {
-            console.log(`Checking direction ${dir.name}`);
-            
             // Step 1: initial move
             let pos = { i: current.i === this.topography.length - 1 ? 0 : current.i + dir.di, j: current.j + dir.dj };
             let topo = this.getTopography(pos.i, pos.j);
-
-            console.log(`  Initial position to check: (${pos.i}, ${pos.j}) with topo ${topo}`);
-            
-
-            if (isBlocking(topo)) continue;
+            if (isBlocking(topo) || this.getOccupyingPlayerId(pos.i, pos.j) !== null) continue;
             if (topo !== TrackSpaceType.INVISIBLE_SPACE) {
-                console.log(`  Found visible space at (${pos.i}, ${pos.j}) on initial move`);
                 results.push(pos);
                 continue;
             }
@@ -480,12 +473,8 @@ export class TestGame extends Phaser.Scene {
             // Step 2: invisible -> apply delta1
             pos = { i: pos.i + dir.delta1.di, j: pos.j + dir.delta1.dj };
             topo = this.getTopography(pos.i, pos.j);
-
-            console.log(`  After delta1 position to check: (${pos.i}, ${pos.j}) with topo ${topo}`);
-
-            if (isBlocking(topo)) continue;
+            if (isBlocking(topo) || this.getOccupyingPlayerId(pos.i, pos.j) !== null) continue;
             if (topo !== TrackSpaceType.INVISIBLE_SPACE) {
-                console.log(`  Found visible space at (${pos.i}, ${pos.j}) after delta1`);
                 results.push(pos);
                 continue;
             }
@@ -493,19 +482,11 @@ export class TestGame extends Phaser.Scene {
             // Step 3: still invisible -> apply delta2
             pos = { i: pos.i + dir.delta2.di, j: pos.j + dir.delta2.dj };
             topo = this.getTopography(pos.i, pos.j);
-            
-            console.log(`  After delta2 position to check: (${pos.i}, ${pos.j}) with topo ${topo}`);
-
-            if (isBlocking(topo)) continue;
+            if (isBlocking(topo) || this.getOccupyingPlayerId(pos.i, pos.j) !== null) continue;
             if (topo !== TrackSpaceType.INVISIBLE_SPACE) {
-                console.log(`  Found visible space at (${pos.i}, ${pos.j}) after delta2`);
                 results.push(pos);
             }
-            console.log(`  No valid space found in direction ${dir.name}`);
-            
         }
-
-        console.log(results);
         return results;
     }
 }
