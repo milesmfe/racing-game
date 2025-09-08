@@ -427,42 +427,85 @@ export class TestGame extends Phaser.Scene {
 
     /**
      * Finds selectable spaces directly ahead and diagonally ahead (left and right) from the current space.
-     * Skips invisible spaces, allowing movement to the next non-invisible space in the same direction.
-     * @param current The current space {i, j}.
-     * @returns An array of selectable spaces {i, j}.
+     * Handles invisible spaces with extra step logic:
+     *  F  → delta1 = (1,0), delta2 = (1,0)
+     *  FL → delta1 = (0,1), delta2 = (1,-1)
+     *  FR → delta1 = (0,-1), delta2 = (1,-1)
      */
-    findSelectableSpaces(current: { i: number, j: number }): { i: number, j: number }[] {
-        const moves = [
-            { di: 1, dj: 0 },   // forward
-            { di: 1, dj: 1 },   // diag right
-            { di: 1, dj: -1 }   // diag left
-        ];
-        const results: { i: number, j: number }[] = [];
-        for (const move of moves) {
-            const space = this.findNextVisible(current.i, current.j, move.di, move.dj);
-            if (space) results.push(space);
-        }
-        return results;
-    }
+    findSelectableSpaces(current: { i: number; j: number }): { i: number; j: number }[] {
+        const results: { i: number; j: number }[] = [];
 
-    /**
-     * Returns the next non-invisible space in a given direction, skipping invisible spaces.
-     * Returns null if no valid space is found.
-     */
-    private findNextVisible(i: number, j: number, di: number, dj: number): { i: number, j: number } | null {
-        let ni = i + di;
-        let nj = j + dj;
-        if (ni >= this.coordinates.length) ni = 0;
-        while (ni >= 0 && ni < this.coordinates.length && nj >= 0 && nj < this.coordinates[ni].length) {
-            const topo = this.getTopography(ni, nj);
-            if (topo === null) return null;
-            if (topo === TrackSpaceType.OUT_OF_BOUNDS || topo === TrackSpaceType.SPIN_OFF_ZONE) return null;
-            if (this.getOccupyingPlayerId(ni, nj) !== null) return null;
-            if (topo !== TrackSpaceType.INVISIBLE_SPACE) return { i: ni, j: nj };
-            ni += di;
-            nj += dj;
-            if (ni >= this.coordinates.length) ni = 0;
+        // direction + deltas when encountering invisible spaces
+        const directions = [
+            {
+                name: "F",
+                di: 1, dj: 0,
+                delta1: { di: 1, dj: 0 },
+                delta2: { di: 1, dj: 0 }
+            },
+            {
+                name: "FL",
+                di: 1, dj: 1,
+                delta1: { di: 0, dj: 1 },
+                delta2: { di: 1, dj: -1 }
+            },
+            {
+                name: "FR",
+                di: 1, dj: -1,
+                delta1: { di: 0, dj: -1 },
+                delta2: { di: 1, dj: 1 }
+            }
+        ];
+
+        const isBlocking = (topo: TrackSpaceType | null | undefined) =>
+            topo == null || topo === TrackSpaceType.OUT_OF_BOUNDS || topo === TrackSpaceType.SPIN_OFF_ZONE;
+
+        for (const dir of directions) {
+            console.log(`Checking direction ${dir.name}`);
+            
+            // Step 1: initial move
+            let pos = { i: current.i === this.topography.length - 1 ? 0 : current.i + dir.di, j: current.j + dir.dj };
+            let topo = this.getTopography(pos.i, pos.j);
+
+            console.log(`  Initial position to check: (${pos.i}, ${pos.j}) with topo ${topo}`);
+            
+
+            if (isBlocking(topo)) continue;
+            if (topo !== TrackSpaceType.INVISIBLE_SPACE) {
+                console.log(`  Found visible space at (${pos.i}, ${pos.j}) on initial move`);
+                results.push(pos);
+                continue;
+            }
+
+            // Step 2: invisible -> apply delta1
+            pos = { i: pos.i + dir.delta1.di, j: pos.j + dir.delta1.dj };
+            topo = this.getTopography(pos.i, pos.j);
+
+            console.log(`  After delta1 position to check: (${pos.i}, ${pos.j}) with topo ${topo}`);
+
+            if (isBlocking(topo)) continue;
+            if (topo !== TrackSpaceType.INVISIBLE_SPACE) {
+                console.log(`  Found visible space at (${pos.i}, ${pos.j}) after delta1`);
+                results.push(pos);
+                continue;
+            }
+
+            // Step 3: still invisible -> apply delta2
+            pos = { i: pos.i + dir.delta2.di, j: pos.j + dir.delta2.dj };
+            topo = this.getTopography(pos.i, pos.j);
+            
+            console.log(`  After delta2 position to check: (${pos.i}, ${pos.j}) with topo ${topo}`);
+
+            if (isBlocking(topo)) continue;
+            if (topo !== TrackSpaceType.INVISIBLE_SPACE) {
+                console.log(`  Found visible space at (${pos.i}, ${pos.j}) after delta2`);
+                results.push(pos);
+            }
+            console.log(`  No valid space found in direction ${dir.name}`);
+            
         }
-        return null;
+
+        console.log(results);
+        return results;
     }
 }

@@ -1,0 +1,8 @@
+move,di,dj,checki,checkj
+A,null,null,null,null
+B,1,0,null,null
+C,1,1,null,null
+D,1,-1,null,null
+E,2,0,2,null
+F,1,2,1,-1
+G,1,-2,1,1
