@@ -260,6 +260,18 @@ export class TestGame extends Phaser.Scene {
         if (this.playerTurnId == null) return;
         const closest = this.findNearestValidSpace({ x: pointer.x, y: pointer.y });
         if (!closest) return;
+        // If clicked space is the last item in stepSpaces, remove it
+        const lastStep = this.stepSpaces[this.stepSpaces.length - 1];
+        if (lastStep != null && lastStep.i === closest.i && lastStep.j === closest.j) {
+            // Remove last highlight circle
+            const lastCircle = this.selectedHighlightCircles.pop();
+            lastCircle?.destroy();
+            this.stepSpaces.pop();
+            // Recalculate available spaces based on previous step or current player position
+            const prev = this.stepSpaces[this.stepSpaces.length - 1] || this.players[this.playerTurnId].currentPosition;
+            this.availableSpaces = this.findSelectableSpaces(prev);
+            return;
+        }
         const isAvailable = this.availableSpaces.some(s => s.i === closest.i && s.j === closest.j);
         if (!isAvailable) return;
         const coords = this.getCoordinates(closest.i, closest.j);
