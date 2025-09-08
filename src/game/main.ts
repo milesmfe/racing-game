@@ -9,6 +9,9 @@ const config: Phaser.Types.Core.GameConfig = {
     height: window.innerHeight,
     parent: 'game-container',
     backgroundColor: '#2b6336',
+    dom: {
+        createContainer: true,
+    },
     scene: [
         Boot,
         Preloader,
