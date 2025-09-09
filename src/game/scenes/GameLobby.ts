@@ -238,7 +238,7 @@ export class GameLobby extends Scene {
                     numLaps: this.numLaps,
                     players: this.players
                 };
-                this.scene.start('GameScene', { gameSetup });
+                this.scene.start('GameScene', gameSetup);
             }, { fontSize: '22px', width: 260, height: 56, enabled: startEnabled });
         startBtn.setAlpha(0);
         this.tweens.add({ targets: startBtn, alpha: 1, duration: 220 });

@@ -14,9 +14,10 @@ export class GameScene extends Scene {
 
     create(data?: GameSetup) {
         if (!data) throw new Error('GameScene initialized without game setup data.');
+        if (!data.players || !data.numLaps) throw new Error('GameScene initialized with incomplete game setup data.');
         this.players = data.players;
         this.numLaps = data.numLaps;
-        console.log(`GameScene initialized with players: ${this.players.length}, laps: ${this.numLaps}`);
+        console.log(`GameScene initialized with ${this.players.length} players and ${this.numLaps} laps`);
 
     }
 }
