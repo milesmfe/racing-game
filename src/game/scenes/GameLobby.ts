@@ -8,7 +8,7 @@ const MAX_PLAYERS = 6;
 // TODO: make laps configurable
 // const MIN_LAPS = 3;
 // const MAX_LAPS = 10;
-const VIRTUAL = { W: 1280, H: 720 };
+const VIRTUAL = { W: 1920, H: 1080 };
 const BOX = { W: 160, H: 220, PAD: 24, ROW_Y: 260 };
 
 interface ButtonOpts {
@@ -168,7 +168,7 @@ export class GameLobby extends Scene {
 
         const addBtn = this.makeButton('+', 0, 0, 0xeeeeee, '#222', () => {
             if (this.players.length < MAX_PLAYERS) {
-                const player = new Player(this.nextId++);
+                const player = new Player(this.nextId++ - 1);
                 player.name = `Player ${this.nextId - 1}`;
                 this.players.push(player);
                 this.buildUI();
