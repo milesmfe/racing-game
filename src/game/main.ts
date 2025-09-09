@@ -1,7 +1,8 @@
 import { Boot } from './scenes/Boot';
 import { AUTO, Game } from 'phaser';
 import { Preloader } from './scenes/Preloader';
-import { TestGame } from './scenes/TestGame';
+import { GameLobby } from './scenes/GameLobby';
+import { GameScene } from './scenes/GameScene';
 
 const config: Phaser.Types.Core.GameConfig = {
     type: AUTO,
@@ -15,7 +16,8 @@ const config: Phaser.Types.Core.GameConfig = {
     scene: [
         Boot,
         Preloader,
-        TestGame
+        GameLobby,
+        GameScene
     ]
 };
 

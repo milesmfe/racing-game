@@ -96,13 +96,13 @@ export class TestGame extends Phaser.Scene {
     /**
      * Mapping of player id to starting position.
      */
-    startingPositionMap: Record<number, [number, number]> = {
-        0: [0, 6],
-        1: [0, 5],
-        2: [0, 4],
-        3: [0, 3],
-        4: [0, 2],
-        5: [0, 1]
+    startingPositionMap: Record<number, { i: number, j: number }> = {
+        0: { i: 0, j: 6 },
+        1: { i: 0, j: 5 },
+        2: { i: 0, j: 4 },
+        3: { i: 0, j: 3 },
+        4: { i: 0, j: 2 },
+        5: { i: 0, j: 1 }
     };
 
     constructor() {
@@ -427,7 +427,8 @@ export class TestGame extends Phaser.Scene {
         if (playerId >= Object.keys(this.assetMap).length) return;
         const startingPosition = this.startingPositionMap[playerId];
         const asset = this.assetMap[playerId];
-        const player = new Player(playerId, startingPosition);
+        const player = new Player(playerId);
+        player.currentPosition = startingPosition;
         this.players.push(player);
         const sprite = this.add.image(0, 0, asset);
         sprite.setOrigin(0.5, 0.5);

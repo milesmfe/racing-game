@@ -87,6 +87,6 @@ export class Preloader extends Scene
         trackData['spinOffPoints'] = spinOffPoints;
 
         // Start the main game scene
-        this.scene.start('TestGame');
+        this.scene.start('GameLobby');
     }
 }
