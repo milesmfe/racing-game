@@ -16,9 +16,10 @@ export class Preloader extends Scene
     preload ()
     {
         // Load Assets
-        this.load.image('track', 'assets/track.png');
         this.load.json('track-data', 'assets/track-data.json');
-        this.load.image('logo', 'assets/car-gray.png');
+        this.load.image('track', 'assets/track.png');
+        this.load.image('penalty-chart', 'assets/penalty-chart.png');
+        this.load.image('speed-reduction-chart', 'assets/speed-reduction-chart.png');
         this.load.image('red-car', 'assets/car-red.png');
         this.load.image('purple-car', 'assets/car-purple.png');
         this.load.image('green-car', 'assets/car-green.png');

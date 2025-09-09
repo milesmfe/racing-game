@@ -1,10 +1,11 @@
 export class Player {
     id: number;
-    name: string = "Player";
-    roll: number = 0;
-    rollOrder: number = 0;
+    name: string;
+    roll: number;
+    rollOrder: number;
     currentPosition: { i: number, j: number };
-    currentSpeed: number = 60;
+    currentSpeed: number;
+    currentLap: number;
 
     constructor(id: number) {
         this.id = id;
