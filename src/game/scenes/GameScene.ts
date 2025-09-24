@@ -2,6 +2,7 @@ import { Scene } from 'phaser';
 import { GameSetup } from '../GameSetup';
 import { Player } from '../Player';
 import { TrackData } from '../TrackData';
+import { GridContainer } from '../layout/GridContainer';
 
 const VIRTUAL = { W: 1920, H: 1080 };
 
@@ -123,6 +124,15 @@ export class GameScene extends Scene {
             const pos = this.startingPositionMap[index];
             this.placePlayerOnTrack(player.id, pos);
         });
+        
+        const uiGrid = new GridContainer(this, {
+            rows: 18,
+            cols: 32,
+            width: VIRTUAL.W,
+            height: VIRTUAL.H,
+        });
+        this.gameContainer.add(uiGrid);
+
         // TODO: Add UI:
         // Charts
         // Lap Indicator
