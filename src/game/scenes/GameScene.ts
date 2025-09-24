@@ -123,6 +123,13 @@ export class GameScene extends Scene {
             const pos = this.startingPositionMap[index];
             this.placePlayerOnTrack(player.id, pos);
         });
+        // TODO: Add UI:
+        // Charts
+        // Lap Indicator
+        // Dice A and B
+        // Tire Wear Indicator
+        // Brake Wear Indicator
+        // Speed Selector/Indicators 0-8
         return true;
     }
 
