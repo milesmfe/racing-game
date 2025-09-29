@@ -52,6 +52,11 @@ export class GridContainer extends Phaser.GameObjects.Container {
     /**
      * Place an object in a single cell (default) or span multiple columns/rows.
      * If resizeToSpan is true, the method will attempt to size the object to fit the spanned area.
+     *
+     * Behavior change:
+     * - For multi-cell spans (colSpan>1 || rowSpan>1), the object will be anchored at the top-left of the starting cell
+     *   and sized/positioned to extend to the right and down (i.e. fill the spanned region).
+     * - For single-cell placement the object keeps the previous center placement behavior.
      */
     placeInCell(
         go: Phaser.GameObjects.GameObject,
@@ -62,8 +67,6 @@ export class GridContainer extends Phaser.GameObjects.Container {
         resizeToSpan = false
     ) {
         const bounds = this.cellBounds(col, row, colSpan, rowSpan);
-        const center = { x: bounds.x + bounds.width / 2, y: bounds.y + bounds.height / 2 };
-
         const anyGo: any = go;
 
         // Optionally resize the display object to fill the spanned area.
@@ -83,9 +86,49 @@ export class GridContainer extends Phaser.GameObjects.Container {
             }
         }
 
-        // Position object at center of spanned area.
-        (anyGo as any).x = center.x;
-        (anyGo as any).y = center.y;
+        // If the object spans multiple cells, anchor it at the top-left of the spanned bounds
+        // so it extends right/down from its starting col/row.
+        if (colSpan > 1 || rowSpan > 1) {
+            // Prefer setOrigin when available (Images, Sprites, Text, etc.)
+            if (typeof anyGo.setOrigin === "function") {
+                anyGo.setOrigin(0, 0);
+            } else {
+                // Fallback: try setting numeric origin properties only if writable.
+                // Some GameObjects like Container expose origin getters without setters;
+                // attempting to assign to those will throw, so guard with descriptors.
+                try {
+                    if ("originX" in anyGo) {
+                        const descX =
+                            Object.getOwnPropertyDescriptor(anyGo, "originX") ||
+                            Object.getOwnPropertyDescriptor(Object.getPrototypeOf(anyGo), "originX");
+                        if (!descX || descX.writable) {
+                            anyGo.originX = 0;
+                        }
+                    }
+                    if ("originY" in anyGo) {
+                        const descY =
+                            Object.getOwnPropertyDescriptor(anyGo, "originY") ||
+                            Object.getOwnPropertyDescriptor(Object.getPrototypeOf(anyGo), "originY");
+                        if (!descY || descY.writable) {
+                            anyGo.originY = 0;
+                        }
+                    }
+                } catch (e) {
+                    // ignore if properties are read-only (e.g. Container) or assignment throws
+                }
+            }
+
+            // Position at top-left of the spanned region
+            anyGo.x = bounds.x;
+            anyGo.y = bounds.y;
+        } else {
+            // Single cell placement: center it in the cell (preserve previous behavior).
+            const center = { x: bounds.x + bounds.width / 2, y: bounds.y + bounds.height / 2 };
+            anyGo.x = center.x;
+            anyGo.y = center.y;
+            // If desired, ensure origin is the default center for consistent centering.
+            // Do not force-set origin here to avoid interfering with callers that already set it.
+        }
 
         this.add(go);
         return go;
