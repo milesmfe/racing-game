@@ -1,5 +1,9 @@
 import { GridOptions } from "./GridOptions";
 
+/**
+ * GridContainer is a lightweight helper for placing Phaser GameObjects into a grid.
+ * It exposes utility methods for cell geometry and a single placement method.
+ */
 export class GridContainer extends Phaser.GameObjects.Container {
     public readonly width: number;
     public readonly height: number;
@@ -15,48 +19,92 @@ export class GridContainer extends Phaser.GameObjects.Container {
         this.setSize(this.width, this.height);
     }
 
-    private cellSize() {
-        const cellW = this.width / this.cols;
-        const cellH = this.height / this.rows;
-        return { cellW, cellH };
+    /**
+     * Cell width/height as computed from container size and grid dimensions.
+     */
+    private get cellSize() {
+        return { cellW: this.width / this.cols, cellH: this.height / this.rows };
     }
 
+    /**
+     * Top-left coordinates of a given cell.
+     */
     cellTopLeft(col: number, row: number) {
-        const { cellW, cellH } = this.cellSize();
+        const { cellW, cellH } = this.cellSize;
         return { x: col * cellW, y: row * cellH };
     }
 
     /**
-     * Returns center of a cell or a spanned cell region.
-     * colSpan and rowSpan default to 1 (single cell).
+     * Center point of a (possibly spanned) cell region.
      */
     cellCenter(col: number, row: number, colSpan = 1, rowSpan = 1) {
-        const { cellW, cellH } = this.cellSize();
-        const x = col * cellW + (colSpan * cellW) / 2;
-        const y = row * cellH + (rowSpan * cellH) / 2;
-        return { x, y };
+        const { cellW, cellH } = this.cellSize;
+        return {
+            x: col * cellW + (colSpan * cellW) / 2,
+            y: row * cellH + (rowSpan * cellH) / 2,
+        };
     }
 
     /**
-     * Returns bounds (top-left and size) of a cell or a spanned region.
+     * Bounds of a (possibly spanned) cell region.
      */
     cellBounds(col: number, row: number, colSpan = 1, rowSpan = 1) {
-        const { cellW, cellH } = this.cellSize();
-        const x = col * cellW;
-        const y = row * cellH;
-        const width = colSpan * cellW;
-        const height = rowSpan * cellH;
-        return { x, y, width, height };
+        const { cellW, cellH } = this.cellSize;
+        return {
+            x: col * cellW,
+            y: row * cellH,
+            width: colSpan * cellW,
+            height: rowSpan * cellH,
+        };
     }
 
     /**
-     * Place an object in a single cell (default) or span multiple columns/rows.
-     * If resizeToSpan is true, the method will attempt to size the object to fit the spanned area.
-     *
-     * Behavior change:
-     * - For multi-cell spans (colSpan>1 || rowSpan>1), the object will be anchored at the top-left of the starting cell
-     *   and sized/positioned to extend to the right and down (i.e. fill the spanned region).
-     * - For single-cell placement the object keeps the previous center placement behavior.
+     * Resize a display-like GameObject to the target width/height if possible.
+     * This prefers setDisplaySize and falls back to common size/scale properties.
+     */
+    private tryResize(go: any, width: number, height: number) {
+        if (typeof go.setDisplaySize === "function") {
+            go.setDisplaySize(width, height);
+            return;
+        }
+
+        if ("displayWidth" in go && "displayHeight" in go) {
+            go.displayWidth = width;
+            go.displayHeight = height;
+            return;
+        }
+
+        if ("width" in go && "height" in go) {
+            const ow = go.width || 1;
+            const oh = go.height || 1;
+            go.scaleX = width / ow;
+            go.scaleY = height / oh;
+        }
+    }
+
+    /**
+     * Try to set origin to (0,0) using setOrigin or writable originX/originY properties.
+     */
+    private trySetOriginTopLeft(go: any) {
+        if (typeof go.setOrigin === "function") {
+            go.setOrigin(0, 0);
+            return;
+        }
+
+        try {
+            const proto = Object.getPrototypeOf(go) || {};
+            const descX = Object.getOwnPropertyDescriptor(go, "originX") || Object.getOwnPropertyDescriptor(proto, "originX");
+            const descY = Object.getOwnPropertyDescriptor(go, "originY") || Object.getOwnPropertyDescriptor(proto, "originY");
+            if (!descX || descX.writable) go.originX = 0;
+            if (!descY || descY.writable) go.originY = 0;
+        } catch (e) {
+            // ignored: some objects have read-only origin properties
+        }
+    }
+
+    /**
+     * Place a GameObject in a grid cell. Multi-cell spans anchor at top-left and optionally resize to fill.
+     * Single-cell placement centers the object in the target cell.
      */
     placeInCell(
         go: Phaser.GameObjects.GameObject,
@@ -69,65 +117,16 @@ export class GridContainer extends Phaser.GameObjects.Container {
         const bounds = this.cellBounds(col, row, colSpan, rowSpan);
         const anyGo: any = go;
 
-        // Optionally resize the display object to fill the spanned area.
-        if (resizeToSpan) {
-            // Preferred: use setDisplaySize if available (Images, Sprites, etc.)
-            if (typeof anyGo.setDisplaySize === "function") {
-                anyGo.setDisplaySize(bounds.width, bounds.height);
-            } else if ("displayWidth" in anyGo && "displayHeight" in anyGo) {
-                anyGo.displayWidth = bounds.width;
-                anyGo.displayHeight = bounds.height;
-            } else if ("width" in anyGo && "height" in anyGo) {
-                // Fallback: scale based on original width/height if present
-                const origW = anyGo.width || 1;
-                const origH = anyGo.height || 1;
-                anyGo.scaleX = bounds.width / origW;
-                anyGo.scaleY = bounds.height / origH;
-            }
-        }
+        if (resizeToSpan) this.tryResize(anyGo, bounds.width, bounds.height);
 
-        // If the object spans multiple cells, anchor it at the top-left of the spanned bounds
-        // so it extends right/down from its starting col/row.
         if (colSpan > 1 || rowSpan > 1) {
-            // Prefer setOrigin when available (Images, Sprites, Text, etc.)
-            if (typeof anyGo.setOrigin === "function") {
-                anyGo.setOrigin(0, 0);
-            } else {
-                // Fallback: try setting numeric origin properties only if writable.
-                // Some GameObjects like Container expose origin getters without setters;
-                // attempting to assign to those will throw, so guard with descriptors.
-                try {
-                    if ("originX" in anyGo) {
-                        const descX =
-                            Object.getOwnPropertyDescriptor(anyGo, "originX") ||
-                            Object.getOwnPropertyDescriptor(Object.getPrototypeOf(anyGo), "originX");
-                        if (!descX || descX.writable) {
-                            anyGo.originX = 0;
-                        }
-                    }
-                    if ("originY" in anyGo) {
-                        const descY =
-                            Object.getOwnPropertyDescriptor(anyGo, "originY") ||
-                            Object.getOwnPropertyDescriptor(Object.getPrototypeOf(anyGo), "originY");
-                        if (!descY || descY.writable) {
-                            anyGo.originY = 0;
-                        }
-                    }
-                } catch (e) {
-                    // ignore if properties are read-only (e.g. Container) or assignment throws
-                }
-            }
-
-            // Position at top-left of the spanned region
+            this.trySetOriginTopLeft(anyGo);
             anyGo.x = bounds.x;
             anyGo.y = bounds.y;
         } else {
-            // Single cell placement: center it in the cell (preserve previous behavior).
             const center = { x: bounds.x + bounds.width / 2, y: bounds.y + bounds.height / 2 };
             anyGo.x = center.x;
             anyGo.y = center.y;
-            // If desired, ensure origin is the default center for consistent centering.
-            // Do not force-set origin here to avoid interfering with callers that already set it.
         }
 
         this.add(go);
