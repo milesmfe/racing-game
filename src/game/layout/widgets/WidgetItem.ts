@@ -18,7 +18,9 @@ export class WidgetItem extends Item {
     }
 
     setPosition(x: number, y: number): void {
-        this.widget.setPosition(x, y);
+        const width = this.getWidth();
+        const height = this.getHeight();
+        this.widget.setPosition(x - width / 2, y - height / 2);
     }
 
     getPosition(): { x: number; y: number } {

@@ -38,6 +38,7 @@ export class Widget {
         this.container = this.scene.add.container(options.x ?? 0, options.y ?? 0);
         this.background = this.scene.add.graphics();
         this.container.add(this.background);
+        this.container.setSize(this.width, this.height);
 
         this.drawBackground();
     }
@@ -62,8 +63,8 @@ export class Widget {
     /**
      * Convenience method: Add an image item to the widget.
      */
-    addImage(texture: string, frame?: string | number): ImageItem {
-        return this.addItem(new ImageItem(this.scene, texture, frame)) as ImageItem;
+    addImage(texture: string, scale?: number, frame?: string | number): ImageItem {
+        return this.addItem(new ImageItem(this.scene, texture, scale, frame)) as ImageItem;
     }
 
     /**
@@ -125,6 +126,14 @@ export class Widget {
             this.container.remove(item.getObject());
             this.relayout();
         }
+    }
+
+    /**
+    * Removes all items from the widget.
+    */
+    public removeAllItems(): void {
+        this.items.forEach(item => this.container.remove(item.getObject(), true));
+        this.items = [];
     }
 
     /**
@@ -209,6 +218,14 @@ export class Widget {
         this.height = height;
         this.drawBackground();
         this.relayout();
+        return this;
+    }
+
+    /**
+     * Set the visibility of the widget's container.
+     */
+    public setVisible(visible: boolean): this {
+        this.container.setVisible(visible);
         return this;
     }
 

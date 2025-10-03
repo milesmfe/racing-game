@@ -11,8 +11,8 @@ export interface HitResult {
 }
 
 /**
- * Widget with hit detection capabilities. Can detect which item is closest
- * to given coordinates, recursively checking nested widgets.
+ * An interactive widget that can handle pointer events.
+ * Extends the base Widget with click handling and an enabled/disabled state.
  */
 export class HitboxWidget extends Widget {
     private hitRadius: number;
@@ -20,6 +20,38 @@ export class HitboxWidget extends Widget {
     constructor(options: WidgetOptions & { hitRadius?: number }) {
         super(options);
         this.hitRadius = options.hitRadius ?? 20;
+    }
+
+    /**
+     * Assigns a callback to be executed when the widget is clicked.
+     * This method also makes the widget's background interactive.
+     */
+    public onClick(callback: () => void): this {
+        const hitArea = new Phaser.Geom.Rectangle(0, 0, this.width, this.height);
+        this.background
+            .setInteractive({
+                hitArea: hitArea,
+                hitAreaCallback: Phaser.Geom.Rectangle.Contains,
+                useHandCursor: true,
+            })
+            .on('pointerdown', callback);
+
+        return this;
+    }
+
+    /**
+     * Enable or disable interactivity for the widget.
+     * Visually updates the alpha to reflect the state.
+     */
+    public setEnabled(enabled: boolean): this {
+        // Ensure the input component has been created by an onClick call first.
+        if (!this.background.input) {
+            return this;
+        }
+
+        this.background.input.enabled = enabled;
+        this.container.setAlpha(enabled ? 1 : 0.5);
+        return this;
     }
 
     /**
@@ -41,7 +73,7 @@ export class HitboxWidget extends Widget {
 
         for (const item of this.items) {
             const result = this.checkItemHit(item, localX, localY);
-            
+
             if (result && (!closestResult || result.distance < closestResult.distance)) {
                 closestResult = result;
             }
@@ -54,27 +86,21 @@ export class HitboxWidget extends Widget {
      * Check hit for a single item. Recursively checks nested widgets.
      */
     private checkItemHit(item: Item, localX: number, localY: number): HitResult | undefined {
-        // Handle nested widgets recursively
         if (item instanceof WidgetItem) {
             const nestedWidget = item.getWidget();
-            
-            // If it's a HitboxWidget, use its hit detection
             if (nestedWidget instanceof HitboxWidget) {
                 const position = item.getPosition();
                 const nestedLocalX = localX - position.x;
                 const nestedLocalY = localY - position.y;
-                
                 return nestedWidget.checkHitLocal(nestedLocalX, nestedLocalY);
             }
         }
 
-        // Calculate distance to item center
         const position = item.getPosition();
         const dx = localX - position.x;
         const dy = localY - position.y;
         const distance = Math.sqrt(dx * dx + dy * dy);
 
-        // Check if within hit radius
         if (distance <= this.hitRadius) {
             return {
                 item,
@@ -85,20 +111,5 @@ export class HitboxWidget extends Widget {
         }
 
         return undefined;
-    }
-
-    /**
-     * Set the hit detection radius.
-     */
-    setHitRadius(radius: number): this {
-        this.hitRadius = radius;
-        return this;
-    }
-
-    /**
-     * Get the hit detection radius.
-     */
-    getHitRadius(): number {
-        return this.hitRadius;
     }
 }

@@ -7,8 +7,11 @@ import { Item } from './Item';
 export class ImageItem extends Item {
     private image: Phaser.GameObjects.Image;
 
-    constructor(scene: Phaser.Scene, texture: string, frame?: string | number) {
+    constructor(scene: Phaser.Scene, texture: string, scale?: number, frame?: string | number) {
         const image = scene.add.image(0, 0, texture, frame).setOrigin(0.5);
+        if (scale) {
+            image.setScale(scale);
+        }
         super(image);
         this.image = image;
     }
