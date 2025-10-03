@@ -1,7 +1,7 @@
 import { Scene } from 'phaser';
 import { Player } from '../Player';
 import { GameSetup } from '../GameSetup';
-import { Widget, HitboxWidget, WidgetItem, TextItem } from '../layout/widgets'; // Assuming TextItem is exported
+import { Widget, HitboxWidget, WidgetItem, TextItem } from '../layout/widgets';
 
 type Phase = 'add' | 'roll' | 'done';
 
@@ -27,7 +27,6 @@ export class GameLobby extends Scene {
     private rootWidget!: Widget;
     private playerWidget!: Widget;
 
-    // References to the currently active UI items that need to be cleared
     private activePromptItem: TextItem | null = null;
     private activeButtonItem: WidgetItem | null = null;
 
@@ -43,7 +42,6 @@ export class GameLobby extends Scene {
         this.onResize();
     }
 
-    //region State Management
     private reset() {
         this.players = [];
         this.phase = 'add';
@@ -67,12 +65,11 @@ export class GameLobby extends Scene {
     };
 
     private handleRemovePlayer = (playerId: number) => {
-        let updatedPlayers = this.players.filter(p => p.id !== playerId);
-        updatedPlayers.forEach((player, index) => {
+        this.players = this.players.filter(p => p.id !== playerId);
+        this.players.forEach((player, index) => {
             player.id = index;
             player.name = `Player ${index + 1}`;
         });
-        this.players = updatedPlayers;
         this.updateUI();
     };
 
@@ -103,9 +100,7 @@ export class GameLobby extends Scene {
         const sortedPlayers = [...this.players].sort((a, b) => (b.roll ?? 0) - (a.roll ?? 0));
         sortedPlayers.forEach((player, index) => { player.rollOrder = index; });
     }
-    //endregion
 
-    //region UI Management
     private setupUI() {
         const { W, H } = CONFIG.VIRTUAL_DIMENSIONS;
 
@@ -117,7 +112,6 @@ export class GameLobby extends Scene {
             backgroundAlpha: 0
         });
 
-        // Add placeholders that will be replaced by updateUI
         this.rootWidget.addText('Lobby', 50, '#ffffff');
 
         const playerWidgetWidth = (CONFIG.PLAYER_BOX.W + 20) * CONFIG.MAX_PLAYERS;
@@ -134,7 +128,6 @@ export class GameLobby extends Scene {
     private updateUI() {
         this.rebuildPlayerWidget();
 
-        // Clear previous phase-specific controls
         if (this.activePromptItem) {
             this.rootWidget.removeItem(this.activePromptItem);
             this.activePromptItem.getObject().destroy();
@@ -148,11 +141,12 @@ export class GameLobby extends Scene {
 
         let button: HitboxWidget | null = null;
 
-        // Create and add the controls for the current phase
         switch (this.phase) {
             case 'add':
                 this.activePromptItem = this.rootWidget.addText('Select the number of players', 35, '#ffffff');
-                button = this.createButton({ width: 320, height: 56, text: 'Roll for Position', bgColor: 0xffa500, textColor: '#222' }, this.handleRollForPosition);
+                button = new HitboxWidget({ scene: this, width: 320, height: 56, backgroundColor: 0xffa500 });
+                button.addText('Roll for Position', 22, '#222');
+                button.onClick(this.handleRollForPosition);
                 button.setEnabled(this.players.length >= 2);
                 break;
             case 'roll':
@@ -160,12 +154,16 @@ export class GameLobby extends Scene {
                     const name = this.players[this.rollIndex].name;
                     this.activePromptItem = this.rootWidget.addText(`${name}: Roll two dice`, 35, '#ffffff');
                 }
-                button = this.createButton({ width: 170, height: 50, text: 'Roll' }, this.handleRollDice);
+                button = new HitboxWidget({ scene: this, width: 170, height: 50 });
+                button.addText('Roll', 22, '#fff');
+                button.onClick(this.handleRollDice);
                 break;
             case 'done':
                 if (this.players.length > 0) {
                     this.activePromptItem = this.rootWidget.addText('All players have rolled!', 35, '#ffffff');
-                    button = this.createButton({ width: 260, height: 56, text: 'Start Game', bgColor: 0x00b050 }, this.handleStartGame);
+                    button = new HitboxWidget({ scene: this, width: 260, height: 56, backgroundColor: 0x00b050 });
+                    button.addText('Start Game', 22, '#fff');
+                    button.onClick(this.handleStartGame);
                 }
                 break;
         }
@@ -199,7 +197,9 @@ export class GameLobby extends Scene {
             box.addImage(carKey, CONFIG.CAR_SCALE);
         }
         if (this.phase === 'add') {
-            const removeBtn = this.createButton({ width: 100, height: 34, text: 'Remove', bgColor: 0xb00, fontSize: 14 }, () => {
+            const removeBtn = new HitboxWidget({ scene: this, width: 100, height: 34, backgroundColor: 0xb00 });
+            removeBtn.addText('Remove', 14, '#fff');
+            removeBtn.onClick(() => {
                 this.tweens.add({
                     targets: box.getContainer(), scale: 0, alpha: 0, duration: 180, ease: 'Back.In',
                     onComplete: () => this.handleRemovePlayer(player.id)
@@ -213,19 +213,11 @@ export class GameLobby extends Scene {
     private makeAddBox(): Widget {
         const box = new Widget({ scene: this, width: CONFIG.PLAYER_BOX.W, height: CONFIG.PLAYER_BOX.H, layout: 'vertical', padding: 8 });
         box.addText('Add Player', 20, '#ffffff');
-        const addBtn = this.createButton({ width: 90, height: 90, text: '+', fontSize: 44, textColor: '#222' }, this.handleAddPlayer);
+        const addBtn = new HitboxWidget({ scene: this, width: 90, height: 90 });
+        addBtn.addText('+', 44, '#222');
+        addBtn.onClick(this.handleAddPlayer);
         box.addItem(new WidgetItem(addBtn));
         return box;
-    }
-
-    private createButton(opts: any, onClick: () => void): HitboxWidget {
-        const btn = new HitboxWidget({ scene: this, width: opts.width, height: opts.height, backgroundColor: opts.bgColor });
-        btn.addText(opts.text, opts.fontSize ?? 22, opts.textColor ?? '#fff');
-        btn.onClick(() => {
-            this.tweens.add({ targets: btn.getContainer(), ...CONFIG.TWEENS.BUTTON_CLICK });
-            onClick();
-        });
-        return btn;
     }
 
     private onResize = () => {
@@ -236,5 +228,4 @@ export class GameLobby extends Scene {
         rootContainer.setScale(scale);
         rootContainer.setPosition((width - W * scale) / 2, (height - H * scale) / 2);
     };
-    //endregion
 }
