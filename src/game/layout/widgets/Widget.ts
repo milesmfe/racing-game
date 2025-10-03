@@ -3,6 +3,7 @@ import { Item } from './Item';
 import { TextItem } from './TextItem';
 import { ImageItem } from './ImageItem';
 import { WidgetItem } from './WidgetItem';
+import { ProgressBarItem, ProgressBarOptions } from './ProgressBarItem';
 import { WidgetOptions, WidgetLayout } from './types';
 
 /**
@@ -70,6 +71,48 @@ export class Widget {
      */
     addWidget(widget: Widget): WidgetItem {
         return this.addItem(new WidgetItem(widget)) as WidgetItem;
+    }
+
+    /**
+     * Convenience method: Add a progress bar item to the widget.
+     * * @param initialProgress - A value from 0 to 1 for the bar's initial progress.
+     */
+    addProgressBar(initialProgress?: number): ProgressBarItem;
+
+    /**
+     * Convenience method: Add a progress bar item to the widget.
+     * * @param options - A configuration object to customize the progress bar.
+     */
+    addProgressBar(options: Partial<Omit<ProgressBarOptions, 'scene'>>): ProgressBarItem;
+
+    /**
+     * Implementation of the overloaded addProgressBar method.
+     */
+    addProgressBar(
+        optionsOrProgress?: number | Partial<Omit<ProgressBarOptions, 'scene'>>
+    ): ProgressBarItem {
+        let options: Partial<Omit<ProgressBarOptions, 'scene'>>;
+
+        // Check if the user passed a simple number for progress or a full options object.
+        if (typeof optionsOrProgress === 'number' || typeof optionsOrProgress === 'undefined') {
+            options = { initialProgress: optionsOrProgress };
+        } else {
+            options = optionsOrProgress;
+        }
+
+        // Define sensible defaults. The bar's width is based on the widget's width minus padding.
+        const defaultOptions = {
+            width: this.width - this.padding * 2,
+            height: 16, // A reasonable default height in pixels.
+        };
+
+        const finalOptions: ProgressBarOptions = {
+            scene: this.scene,
+            ...defaultOptions,
+            ...options, // User options will override defaults.
+        };
+
+        return this.addItem(new ProgressBarItem(finalOptions)) as ProgressBarItem;
     }
 
     /**
