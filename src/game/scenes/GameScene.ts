@@ -2,19 +2,19 @@ import { Scene } from 'phaser';
 import { GameSetup } from '../GameSetup';
 import { Player } from '../Player';
 import { TrackData } from '../TrackData';
-import { GridContainer } from '../layout/GridContainer';
-import { Widget } from '../layout/Widget';
+import { GridContainer } from '../layout/grid/index';
+import { Widget, HitboxWidget } from '../layout/widgets/index';
 
 const VIRTUAL = { W: 1920, H: 1080 };
 
-type Phase = 'moving' | 'moved';
+// type Phase = 'moving' | 'moved';
 
 export class GameScene extends Scene {
     private players: Player[];
     private playerImages: Phaser.GameObjects.Image[] = [];
     private numLaps: number;
     private currentLap: number = 1;
-    private phase: Phase;
+    // private phase: Phase;
     private currentPlayerIndex: number;
     private gameContainer: Phaser.GameObjects.Container;
     private trackImage: Phaser.GameObjects.Image;
@@ -128,88 +128,115 @@ export class GameScene extends Scene {
         });
 
         // Grid
-        const uiGrid = new GridContainer(this, {
+        const grid = new GridContainer({
+            scene: this,
             cols: 32,
             rows: 18,
             width: VIRTUAL.W,
-            height: VIRTUAL.H,
+            height: VIRTUAL.H
         });
-        this.gameContainer.add(uiGrid);
+        this.gameContainer.add(grid);
 
         // Charts
         const charts = this.add.image(0, 0, 'charts');
-        uiGrid.placeInCell(charts, 25, 1, 6, 12);
+        grid.addItem(charts, {
+            col: 25,
+            row: 1,
+            colSpan: 6,
+            rowSpan: 12
+        });
 
         // Lap Indicator
-        const lapIndicator = Widget
-            .create({
-                scene: this,
-                width: 120,
-                height: 120,
-                cornerRadius: 20,
-                layout: 'vertical',
-                padding: 8
-            })
-            .addText('Lap', 18, '#ffffff')
-            .addText(`${this.currentLap} / ${this.numLaps}`, 28, '#ffff00')
-            .getContainer();
+        const lapIndicator = new Widget({
+            scene: this,
+            width: 120,
+            height: 120,
+            cornerRadius: 20,
+            layout: 'vertical',
+            padding: 8
+        });
+        lapIndicator.addText('Lap', 18, '#ffffff');
+        lapIndicator.addText(`${this.currentLap} / ${this.numLaps}`, 28, '#ffff00');
 
-        uiGrid.placeInCell(lapIndicator, 3, 6, 2, 2);
+        grid.addItem(lapIndicator.getContainer(), {
+            col: 3,
+            row: 6,
+            colSpan: 2,
+            rowSpan: 2
+        });
 
         // Dice A and Dice B
         const makeDiceWidget = (label: string) => {
-            const w = Widget.create({
+            const w = new Widget({
                 scene: this,
                 width: 120,
                 height: 120,
                 cornerRadius: 20,
                 layout: 'vertical',
                 padding: 8
-            })
-                .addText(label, 18, '#ccc')
-                .addText('?', 36, '#ffff00')
-                .getContainer();
-            return w;
+            });
+            w.addText(label, 18, '#ccc');
+            w.addText('?', 36, '#ffff00');
+            return w.getContainer();
         };
         const diceA = makeDiceWidget('Dice A');
         const diceB = makeDiceWidget('Dice B');
-        uiGrid.placeInCell(diceA, 2, 9, 2, 2);
-        uiGrid.placeInCell(diceB, 4, 9, 2, 2);
+
+        grid.addItem(diceA, {
+            col: 2,
+            row: 9,
+            colSpan: 2,
+            rowSpan: 2
+        });
+        grid.addItem(diceB, {
+            col: 4,
+            row: 9,
+            colSpan: 2,
+            rowSpan: 2
+        });
 
         // Tire Wear Indicator
-        const tireWidget = Widget.create({
+        const tireWidget = new Widget({
             scene: this,
             width: 240,
             height: 120,
             cornerRadius: 20,
             layout: 'vertical',
             padding: 8
-        })
-            .addText('Tire Wear', 16, '#fff')
-            .addText('3', 16, '#ffff00')
-            .addBar(3 / 8)
-            .getContainer();
+        });
+        tireWidget.addText('Tire Wear', 16, '#fff');
+        tireWidget.addText('3', 16, '#ffff00');
+        const tireProgressBar = tireWidget.addProgressBar(0.3);
 
-        uiGrid.placeInCell(tireWidget, 2, 14, 4, 2);
+        grid.addItem(tireWidget.getContainer(), {
+            col: 2,
+            row: 14,
+            colSpan: 4,
+            rowSpan: 2
+        });
 
         // Brake Wear Indicator
-        const brakeWidget = Widget.create({
+        const brakeWidget = new Widget({
             scene: this,
             width: 240,
             height: 120,
             cornerRadius: 20,
             layout: 'vertical',
             padding: 8
-        })
-            .addText('Brake Wear', 16, '#fff')
-            .addText('7', 16, '#ffff00')
-            .addBar(7 / 8)
-            .getContainer();
+        });
+        brakeWidget.addText('Brake Wear', 16, '#fff');
+        brakeWidget.addText('7', 16, '#ffff00');
+        const brakeProgressBar = brakeWidget.addProgressBar(7 / 8);
 
-        uiGrid.placeInCell(brakeWidget, 26, 14, 4, 2);
+        grid.addItem(brakeWidget.getContainer(), {
+            col: 26,
+            row: 14,
+            colSpan: 4,
+            rowSpan: 2
+        });
 
         // Speed Selector / Indicators 0-8
-        const speedWidget = Widget.create({
+        const speedWidget = new HitboxWidget({
             scene: this,
             width: 1080,
             height: 120,
@@ -217,19 +244,22 @@ export class GameScene extends Scene {
             layout: 'horizontal',
             padding: 8
         });
-
         for (let speed = 0; speed <= 140; speed += 20) {
-            speedWidget
-                .addText(`${speed}`, 24, '#ffffff', { speed })
+            speedWidget.addText(`${speed}`, 24, '#ffffff');
         }
 
-        uiGrid.placeInCell(speedWidget.getContainer(), 7, 14, 18, 2);
+        grid.addItem(speedWidget.getContainer(), {
+            col: 7,
+            row: 14,
+            colSpan: 18,
+            rowSpan: 2
+        });
 
         return true;
     }
 
     private startMove() {
         if (this.currentPlayerIndex == this.players.length + 1 || this.currentPlayerIndex == null) this.currentPlayerIndex = 0;
-        this.phase = 'moving';
+        // this.phase = 'moving';
     }
 }
