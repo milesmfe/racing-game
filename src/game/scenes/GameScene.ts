@@ -2,8 +2,8 @@ import { Scene } from 'phaser';
 import { GameSetup } from '../GameSetup';
 import { Player } from '../Player';
 import { TrackData } from '../TrackData';
-import { GridContainer } from '../layout/grid/index';
-import { Widget, HitboxWidget } from '../layout/widgets/index';
+import { GridContainer } from '../layout/grid';
+import { Widget, HitboxWidget } from '../layout/widgets';
 
 const VIRTUAL = { W: 1920, H: 1080 };
 
@@ -206,7 +206,7 @@ export class GameScene extends Scene {
         });
         tireWidget.addText('Tire Wear', 16, '#fff');
         tireWidget.addText('3', 16, '#ffff00');
-        const tireProgressBar = tireWidget.addProgressBar(0.3);
+        tireWidget.addProgressBar(0.3);
 
         grid.addItem(tireWidget.getContainer(), {
             col: 2,
@@ -226,7 +226,7 @@ export class GameScene extends Scene {
         });
         brakeWidget.addText('Brake Wear', 16, '#fff');
         brakeWidget.addText('7', 16, '#ffff00');
-        const brakeProgressBar = brakeWidget.addProgressBar(7 / 8);
+        brakeWidget.addProgressBar(7 / 8);
 
         grid.addItem(brakeWidget.getContainer(), {
             col: 26,
