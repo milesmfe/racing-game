@@ -1,14 +1,20 @@
+/**
+ * Shared types and interfaces for the widget system.
+ */
+
+import Phaser from 'phaser';
+
 export type WidgetLayout = 'horizontal' | 'vertical';
 
 export interface WidgetOptions {
     scene: Phaser.Scene;
-    width: number;
-    height: number;
     x?: number;
     y?: number;
+    width: number;
+    height: number;
     cornerRadius?: number;
     layout?: WidgetLayout;
     padding?: number;
-    progress?: number;
-    hitRadius?: number;
+    backgroundColor?: number;
+    backgroundAlpha?: number;
 }
