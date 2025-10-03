@@ -245,8 +245,12 @@ export class GameScene extends Scene {
             padding: 8
         });
         for (let speed = 0; speed <= 140; speed += 20) {
-            speedWidget.addText(`${speed}`, 24, '#ffffff');
+            speedWidget.addText(`${speed}`, 24, '#ffffff', () => console.log(`Speed selected: ${speed}`));
         }
+
+        speedWidget.onClick(() => {
+            console.log('Speed widget clicked');
+        });
 
         grid.addItem(speedWidget.getContainer(), {
             col: 7,
