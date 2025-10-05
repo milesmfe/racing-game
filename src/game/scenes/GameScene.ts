@@ -187,12 +187,21 @@ export class GameScene extends Scene {
         const player = this.players[this.currentPlayerIndex];
         if (this.stepSpaces.length > 0) {
             const finalPosition = this.stepSpaces[this.stepSpaces.length - 1];
+
             if (this.didCrossFinishLine(player.currentPosition, finalPosition)) {
                 player.lapsRemaining--;
                 if (player.lapsRemaining === 0) {
                     this.message.setText(`${player.name} has finished the race!`);
                 }
             }
+
+            const playerPitStop = this.pitStopMap[player.id];
+            if (finalPosition.i === playerPitStop.i && finalPosition.j === playerPitStop.j) {
+                this.message.setText(`${player.name} made a pit stop!`);
+                player.brakeWear = 0;
+                player.tyreWear = 0;
+            }
+
             player.currentPosition = finalPosition;
             this.placePlayerOnTrack(player.id, finalPosition);
         }
