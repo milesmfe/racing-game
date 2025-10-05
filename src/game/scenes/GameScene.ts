@@ -52,6 +52,11 @@ export class GameScene extends Scene {
         3: { i: 0, j: 3 }, 4: { i: 0, j: 2 }, 5: { i: 0, j: 1 }
     };
 
+    private pitStopMap: Record<number, { i: number, j: number }> = {
+        0: { i: 2, j: 0 }, 1: { i: 1, j: 0 }, 2: { i: 0, j: 0 },
+        3: { i: 64, j: 0 }, 4: { i: 63, j: 0 }, 5: { i: 62, j: 0 }
+    };
+
     private get trackData(): TrackData {
         return this.cache.json.get('track-data') as TrackData;
     }
