@@ -2498,5 +2498,99 @@
                 1185
             ]
         ]
-    ]
+    ],
+    "penaltyChart": {
+        "20": {
+            "2": null,
+            "3": {
+                "spinOff": true,
+                "message": "Spin Off!"
+            },
+            "4": {
+                "tyreWear": 1,
+                "message": "+1 Tyre Wear"
+            },
+            "5": {
+                "tyreWear": 1,
+                "message": "+1 Tyre Wear"
+            },
+            "6": {
+                "tyreWear": 2,
+                "spinOffIfTyreWear4": true,
+                "message": "+2 Tyre Wear"
+            },
+            "6d": {
+                "message": "Double 3s! No Penalty."
+            },
+            "7": null,
+            "8": {
+                "tyreWear": 1,
+                "message": "+1 Tyre Wear"
+            },
+            "8d": {
+                "message": "Double 4s! No Penalty."
+            },
+            "9": {
+                "tyreWear": 1,
+                "brakeWear": 1,
+                "message": "+1 Tyre, +1 Brake Wear"
+            },
+            "10": null,
+            "11": {
+                "spinOff": true,
+                "message": "Spin Off!"
+            },
+            "12": null
+        },
+        "40": {
+            "2": null,
+            "3": {
+                "spinOff": true,
+                "message": "Spin Off!"
+            },
+            "4": {
+                "tyreWear": 1,
+                "message": "+1 Tyre Wear"
+            },
+            "5": {
+                "tyreWear": 1,
+                "message": "+1 Tyre Wear"
+            },
+            "6": {
+                "tyreWear": 2,
+                "spinOffIfTyreWear4": true,
+                "message": "+2 Tyre Wear"
+            },
+            "6d": {
+                "message": "Double 3s! No Penalty."
+            },
+            "7": {
+                "tyreWear": 1,
+                "brakeWear": 1,
+                "message": "+1 Tyre, +1 Brake Wear"
+            },
+            "8": {
+                "tyreWear": 1,
+                "message": "+1 Tyre Wear"
+            },
+            "8d": {
+                "message": "Double 4s! No Penalty."
+            },
+            "9": {
+                "tyreWear": 1,
+                "brakeWear": 1,
+                "message": "+1 Tyre, +1 Brake Wear"
+            },
+            "10": {
+                "tyreWear": 2,
+                "spinOffIfTyreWear4": true,
+                "message": "+2 Tyre Wear"
+            },
+            "11": {
+                "spinOff": true,
+                "message": "Spin Off!"
+            },
+            "12": null
+        }
+    }
 }

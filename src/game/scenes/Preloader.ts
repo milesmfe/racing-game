@@ -1,5 +1,4 @@
 import { Scene } from 'phaser';
-import { TrackData, TrackSpaceType } from '../TrackData';
 
 export class Preloader extends Scene {
     constructor() {
@@ -14,7 +13,6 @@ export class Preloader extends Scene {
         // Load Assets
         this.load.json('track-data', 'assets/track-data.json');
         this.load.image('track', 'assets/track.png');
-        this.load.image('charts', 'assets/charts.png');
         this.load.image('red-car', 'assets/car-red.png');
         this.load.image('purple-car', 'assets/car-purple.png');
         this.load.image('green-car', 'assets/car-green.png');
@@ -67,20 +65,6 @@ export class Preloader extends Scene {
     }
 
     create() {
-        const trackData: TrackData = this.cache.json.get('track-data');
-        const topography = trackData.topography;
-
-
-        const spinOffPoints: { x: number; y: number }[] = [];
-        for (let y = 0; y < topography.length; y++) {
-            for (let x = 0; x < topography[y].length; x++) {
-                if (topography[y][x] === TrackSpaceType.SPIN_OFF_ZONE) {
-                    spinOffPoints.push({ x, y });
-                }
-            }
-        }
-        trackData['spinOffPoints'] = spinOffPoints;
-
         // Start the main game scene
         this.scene.start('GameLobby');
     }
