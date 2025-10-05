@@ -178,9 +178,10 @@ export class GameScene extends Scene {
     }
 
     private confirmMove = (): void => {
-        if (this.stepSpaces.length !== this.requiredSteps) return;
-        this.phase = 'penalty';
-        this.handleCornering();
+        if (this.stepSpaces.length === this.requiredSteps || this.isBaulked()) {
+            this.phase = 'penalty';
+            this.handleCornering();
+        }
     }
 
     private finalizeMove(): void {
@@ -231,7 +232,9 @@ export class GameScene extends Scene {
         this.hoverHighlightCircle?.destroy();
         this.hoverHighlightCircle = null;
         this.hoveredSpace = closest;
-        if (closest && this.isSpaceAvailable(closest)) this.createHoverHighlight(closest);
+        if (closest && this.isSpaceAvailable(closest) && this.getOccupyingPlayerId(closest.i, closest.j) === null) {
+            this.createHoverHighlight(closest);
+        }
     }
 
     private handlePointerDown(pointer: Phaser.Input.Pointer): void {
@@ -243,7 +246,7 @@ export class GameScene extends Scene {
         const lastStep = this.stepSpaces[this.stepSpaces.length - 1];
         if (lastStep?.i === closest.i && lastStep?.j === closest.j) {
             this.deselectLastSpace();
-        } else if (this.stepSpaces.length < this.requiredSteps && this.isSpaceAvailable(closest)) {
+        } else if (this.stepSpaces.length < this.requiredSteps && this.isSpaceAvailable(closest) && this.getOccupyingPlayerId(closest.i, closest.j) === null) {
             this.selectSpace(closest);
         }
         this.updateUI();
@@ -284,6 +287,12 @@ export class GameScene extends Scene {
             this.finalizeMove();
             return;
         }
+
+        // Reset dice for the new corner
+        this.die1Result = null;
+        this.die2Result = null;
+        this.die1Text.setText('?');
+        this.die2Text.setText('?');
 
         const corner = this.cornersToResolve.shift()!;
         const player = this.players[this.currentPlayerIndex];
@@ -414,8 +423,10 @@ export class GameScene extends Scene {
                 this.confirmMoveButton.getContainer().setVisible(false);
                 break;
             case 'moving':
-                if (this.stepSpaces.length === this.requiredSteps) {
-                    this.message.setText('Confirm your move or click the last space to undo.');
+                const isBaulked = this.isBaulked();
+                if (this.stepSpaces.length === this.requiredSteps || isBaulked) {
+                    const message = isBaulked ? 'You are baulked! Confirm move.' : 'Confirm your move or click the last space to undo.';
+                    this.message.setText(message);
                     this.confirmMoveButton.getContainer().setVisible(true);
                 } else {
                     this.message.setText(`Selected ${this.stepSpaces.length} of ${this.requiredSteps} spaces.`);
@@ -475,6 +486,10 @@ export class GameScene extends Scene {
 
     private isSpaceAvailable(space: { i: number, j: number }): boolean {
         return this.availableSpaces.some(s => s.i === space.i && s.j === space.j);
+    }
+
+    private isBaulked(): boolean {
+        return this.availableSpaces.length > 0 && this.availableSpaces.every(s => this.getOccupyingPlayerId(s.i, s.j) !== null);
     }
 
     private findNearestValidSpace(pos: { x: number, y: number }): { i: number, j: number } | null {
@@ -549,24 +564,21 @@ export class GameScene extends Scene {
             let pos = { i: (current.i + dir.di) % this.trackData.topography.length, j: current.j + dir.dj };
             let topo = this.getTopography(pos.i, pos.j);
 
-            const isOccupied = this.getOccupyingPlayerId(pos.i, pos.j) !== null;
-            if (topo === null || isBlocking(topo) || isOccupied) {
+            if (topo === null || isBlocking(topo)) {
                 continue;
             }
             if (topo !== TrackSpaceType.INVISIBLE_SPACE) { results.push(pos); continue; }
 
             pos = { i: (pos.i + dir.delta1.di) % this.trackData.topography.length, j: pos.j + dir.delta1.dj };
             topo = this.getTopography(pos.i, pos.j);
-            const isOccupied2 = this.getOccupyingPlayerId(pos.i, pos.j) !== null;
-            if (topo === null || isBlocking(topo) || isOccupied2) {
+            if (topo === null || isBlocking(topo)) {
                 continue;
             }
             if (topo !== TrackSpaceType.INVISIBLE_SPACE) { results.push(pos); continue; }
 
             pos = { i: (pos.i + dir.delta2.di) % this.trackData.topography.length, j: pos.j + dir.delta2.dj };
             topo = this.getTopography(pos.i, pos.j);
-            const isOccupied3 = this.getOccupyingPlayerId(pos.i, pos.j) !== null;
-            if (topo !== null && !isBlocking(topo) && !isOccupied3 && topo !== TrackSpaceType.INVISIBLE_SPACE) {
+            if (topo !== null && !isBlocking(topo) && topo !== TrackSpaceType.INVISIBLE_SPACE) {
                 results.push(pos);
             }
         }
