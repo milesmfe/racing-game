@@ -1,8 +1,11 @@
 export enum TrackSpaceType {
-    NORMAL = 1,
-    OUT_OF_BOUNDS = 0,
-    SPIN_OFF_ZONE = -1,
-    INVISIBLE_SPACE = -2,
+    NORMAL_SPACE = 0,
+    INVISIBLE_SPACE = 1,
+    OUT_OF_BOUNDS = 2,
+    STARTING_GRID = 3,
+    FINISH_LINE = 4,
+    PIT_SPACE = 5,
+    SPIN_OFF_ZONE = 6,
 }
 
 // Defines a potential override for a penalty, e.g., for double dice rolls.
