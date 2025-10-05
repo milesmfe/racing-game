@@ -172,7 +172,7 @@ export class GameScene extends Scene {
             return;
         }
 
-        this.availableSpaces = this.findSelectableSpaces(player.currentPosition);
+        this.availableSpaces = this.findSelectableSpaces(player.currentPosition, false);
         this.phase = 'moving';
         this.updateUI();
     }
@@ -204,7 +204,6 @@ export class GameScene extends Scene {
                 this.message.setText(`${player.name} made a pit stop!`);
                 player.brakeWear = 0;
                 player.tyreWear = 0;
-                player.currentSpeed = 0;
             }
 
             player.currentPosition = finalPosition;
@@ -259,14 +258,14 @@ export class GameScene extends Scene {
     private selectSpace(space: { i: number, j: number }): void {
         this.createSelectedHighlight(space);
         this.stepSpaces.push(space);
-        this.availableSpaces = this.findSelectableSpaces(space);
+        this.availableSpaces = this.findSelectableSpaces(space, false);
     }
 
     private deselectLastSpace(): void {
         this.selectedHighlightCircles.pop()?.destroy();
         this.stepSpaces.pop();
         const prev = this.stepSpaces[this.stepSpaces.length - 1] || this.players[this.currentPlayerIndex].currentPosition;
-        this.availableSpaces = this.findSelectableSpaces(prev);
+        this.availableSpaces = this.findSelectableSpaces(prev, false);
     }
 
     // ================================================================================================================
@@ -288,14 +287,24 @@ export class GameScene extends Scene {
 
     private handleBaulking(): void {
         const player = this.players[this.currentPlayerIndex];
-        const blockingPlayerId = this.getOccupyingPlayerId(this.availableSpaces[0].i, this.availableSpaces[0].j);
+        const lastPos = this.stepSpaces[this.stepSpaces.length - 1] || player.currentPosition;
+        const baulkedSpaces = this.findSelectableSpaces(lastPos, true);
+        const blockingPlayerId = this.getOccupyingPlayerId(baulkedSpaces[0].i, baulkedSpaces[0].j);
         const blockingPlayer = this.players.find(p => p.id === blockingPlayerId);
 
-        if (blockingPlayer && player.currentSpeed > blockingPlayer.currentSpeed) {
-            const speedReduction = player.currentSpeed - blockingPlayer.currentSpeed;
-            this.applySpeedReductionPenalties(player, speedReduction);
-            player.currentSpeed = blockingPlayer.currentSpeed;
-            this.message.setText(`Baulked! Speed reduced to ${player.currentSpeed}.`);
+        if (blockingPlayer) {
+            if (player.currentSpeed > blockingPlayer.currentSpeed) {
+                const speedReduction = player.currentSpeed - blockingPlayer.currentSpeed;
+                this.applySpeedReductionPenalties(player, speedReduction);
+                player.currentSpeed = blockingPlayer.currentSpeed;
+                this.message.setText(`Baulked! Speed reduced to ${player.currentSpeed}.`);
+            } else if (player.currentSpeed < blockingPlayer.currentSpeed) {
+                const speedIncrease = blockingPlayer.currentSpeed - player.currentSpeed;
+                if (speedIncrease <= 60) {
+                    player.currentSpeed = blockingPlayer.currentSpeed;
+                    this.message.setText(`Baulked! Speed matched to ${player.currentSpeed}.`);
+                }
+            }
         }
     }
 
@@ -506,7 +515,9 @@ export class GameScene extends Scene {
     }
 
     private isBaulked(): boolean {
-        return this.availableSpaces.length > 0 && this.availableSpaces.every(s => this.getOccupyingPlayerId(s.i, s.j) !== null);
+        const lastPos = this.stepSpaces[this.stepSpaces.length - 1] || this.players[this.currentPlayerIndex].currentPosition;
+        const available = this.findSelectableSpaces(lastPos, true);
+        return available.length > 0 && available.every(s => this.getOccupyingPlayerId(s.i, s.j) !== null);
     }
 
     private findNearestValidSpace(pos: { x: number, y: number }): { i: number, j: number } | null {
@@ -568,7 +579,7 @@ export class GameScene extends Scene {
         return this.players.find(p => p.currentPosition.i === i && p.currentPosition.j === j)?.id ?? null;
     }
 
-    findSelectableSpaces(current: { i: number; j: number }): { i: number; j: number }[] {
+    findSelectableSpaces(current: { i: number; j: number }, ignoreOccupied: boolean): { i: number; j: number }[] {
         const results: { i: number; j: number }[] = [];
         const directions = [
             { name: "F", di: 1, dj: 0, delta1: { di: 1, dj: 0 }, delta2: { di: 1, dj: 0 } },
@@ -581,26 +592,30 @@ export class GameScene extends Scene {
             let pos = { i: (current.i + dir.di) % this.trackData.topography.length, j: current.j + dir.dj };
             let topo = this.getTopography(pos.i, pos.j);
 
-            if (topo === null || isBlocking(topo)) {
+            const isOccupied = this.getOccupyingPlayerId(pos.i, pos.j) !== null;
+            if (topo === null || isBlocking(topo) || (isOccupied && !ignoreOccupied)) {
                 continue;
             }
             if (topo !== TrackSpaceType.INVISIBLE_SPACE) { results.push(pos); continue; }
 
             pos = { i: (pos.i + dir.delta1.di) % this.trackData.topography.length, j: pos.j + dir.delta1.dj };
             topo = this.getTopography(pos.i, pos.j);
-            if (topo === null || isBlocking(topo)) {
+            const isOccupied2 = this.getOccupyingPlayerId(pos.i, pos.j) !== null;
+            if (topo === null || isBlocking(topo) || (isOccupied2 && !ignoreOccupied)) {
                 continue;
             }
             if (topo !== TrackSpaceType.INVISIBLE_SPACE) { results.push(pos); continue; }
 
             pos = { i: (pos.i + dir.delta2.di) % this.trackData.topography.length, j: pos.j + dir.delta2.dj };
             topo = this.getTopography(pos.i, pos.j);
-            if (topo !== null && !isBlocking(topo) && topo !== TrackSpaceType.INVISIBLE_SPACE) {
+            const isOccupied3 = this.getOccupyingPlayerId(pos.i, pos.j) !== null;
+            if (topo !== null && !isBlocking(topo) && (!isOccupied3 || ignoreOccupied) && topo !== TrackSpaceType.INVISIBLE_SPACE) {
                 results.push(pos);
             }
         }
         return results;
     }
+
 
     // ================================================================================================================
     // UI ELEMENT CREATION (HELPERS FOR setupUI)
