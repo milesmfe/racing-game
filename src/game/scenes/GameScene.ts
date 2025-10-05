@@ -204,6 +204,7 @@ export class GameScene extends Scene {
                 this.message.setText(`${player.name} made a pit stop!`);
                 player.brakeWear = 0;
                 player.tyreWear = 0;
+                player.currentSpeed = 0;
             }
 
             player.currentPosition = finalPosition;
