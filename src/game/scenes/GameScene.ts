@@ -179,6 +179,9 @@ export class GameScene extends Scene {
 
     private confirmMove = (): void => {
         if (this.stepSpaces.length === this.requiredSteps || this.isBaulked()) {
+            if (this.isBaulked()) {
+                this.handleBaulking();
+            }
             this.phase = 'penalty';
             this.handleCornering();
         }
@@ -280,6 +283,19 @@ export class GameScene extends Scene {
     private handleCornering(): void {
         this.cornersToResolve = this.stepSpaces.filter(space => (this.getTopography(space.i, space.j) ?? 0) > TrackSpaceType.SPIN_OFF_ZONE);
         this.processNextCorner();
+    }
+
+    private handleBaulking(): void {
+        const player = this.players[this.currentPlayerIndex];
+        const blockingPlayerId = this.getOccupyingPlayerId(this.availableSpaces[0].i, this.availableSpaces[0].j);
+        const blockingPlayer = this.players.find(p => p.id === blockingPlayerId);
+
+        if (blockingPlayer && player.currentSpeed > blockingPlayer.currentSpeed) {
+            const speedReduction = player.currentSpeed - blockingPlayer.currentSpeed;
+            this.applySpeedReductionPenalties(player, speedReduction);
+            player.currentSpeed = blockingPlayer.currentSpeed;
+            this.message.setText(`Baulked! Speed reduced to ${player.currentSpeed}.`);
+        }
     }
 
     private processNextCorner(): void {
