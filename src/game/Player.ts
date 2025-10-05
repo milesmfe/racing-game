@@ -5,7 +5,9 @@ export class Player {
     rollOrder: number;
     currentPosition: { i: number, j: number };
     currentSpeed: number;
-    currentLap: number;
+    brakeWear: number;
+    tyreWear: number;
+    lapsRemaining: number;
 
     constructor(id: number) {
         this.id = id;
