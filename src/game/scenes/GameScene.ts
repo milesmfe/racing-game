@@ -6,6 +6,8 @@ import { GridContainer } from '../layout/grid';
 import { Widget, HitboxWidget, TextItem, ProgressBarItem } from '../layout/widgets';
 
 const VIRTUAL = { W: 1920, H: 1080 };
+const MAX_TYRE_WEAR = 8;
+const MAX_BRAKE_WEAR = 5;
 
 type Phase = 'speedselect' | 'moving' | 'penalty' | 'moved' | 'finished';
 
@@ -162,6 +164,12 @@ export class GameScene extends Scene {
             return;
         }
 
+        if (speedChange < -20 && player.brakeWear >= MAX_BRAKE_WEAR) {
+            this.message.setText('Max brake wear! Forced to spin off.');
+            this.spinOff(player, player.currentPosition);
+            return;
+        }
+
         if (speedChange < 0) this.applySpeedReductionPenalties(player, -speedChange);
 
         player.currentSpeed = speed;
@@ -180,7 +188,7 @@ export class GameScene extends Scene {
     private confirmMove = (): void => {
         if (this.stepSpaces.length === this.requiredSteps || this.isBaulked()) {
             if (this.isBaulked()) {
-                this.handleBaulking();
+                if (!this.handleBaulking()) return;
             }
             this.phase = 'penalty';
             this.handleCornering();
@@ -204,7 +212,6 @@ export class GameScene extends Scene {
                 this.message.setText(`${player.name} made a pit stop!`);
                 player.brakeWear = 0;
                 player.tyreWear = 0;
-                player.currentSpeed = 0;
             }
 
             player.currentPosition = finalPosition;
@@ -275,10 +282,17 @@ export class GameScene extends Scene {
 
     private applySpeedReductionPenalties(player: Player, reduction: number): void {
         if (reduction <= 20) return;
-        if (reduction <= 40) player.brakeWear += 1;
-        else if (reduction <= 60) player.brakeWear += 2;
-        else if (reduction <= 80) { player.brakeWear += 3; player.tyreWear += 1; }
-        else if (reduction <= 100) { player.brakeWear += 4; player.tyreWear += 2; }
+
+        let brakeWearIncurred = 0;
+        let tyreWearIncurred = 0;
+
+        if (reduction <= 40) brakeWearIncurred = 1;
+        else if (reduction <= 60) brakeWearIncurred = 2;
+        else if (reduction <= 80) { brakeWearIncurred = 3; tyreWearIncurred = 1; }
+        else if (reduction <= 100) { brakeWearIncurred = 4; tyreWearIncurred = 2; }
+
+        player.brakeWear = Math.min(player.brakeWear + brakeWearIncurred, MAX_BRAKE_WEAR);
+        player.tyreWear = Math.min(player.tyreWear + tyreWearIncurred, MAX_TYRE_WEAR);
     }
 
     private handleCornering(): void {
@@ -286,7 +300,7 @@ export class GameScene extends Scene {
         this.processNextCorner();
     }
 
-    private handleBaulking(): void {
+    private handleBaulking(): boolean {
         const player = this.players[this.currentPlayerIndex];
         const lastPos = this.stepSpaces[this.stepSpaces.length - 1] || player.currentPosition;
         const baulkedSpaces = this.findSelectableSpaces(lastPos, true);
@@ -296,6 +310,11 @@ export class GameScene extends Scene {
         if (blockingPlayer) {
             if (player.currentSpeed > blockingPlayer.currentSpeed) {
                 const speedReduction = player.currentSpeed - blockingPlayer.currentSpeed;
+                if (player.brakeWear >= MAX_BRAKE_WEAR && speedReduction > 20) {
+                    this.message.setText('Baulked with max brakes! Forced to spin off.');
+                    this.spinOff(player, lastPos);
+                    return false; // Spin-off occurred, stop further processing
+                }
                 this.applySpeedReductionPenalties(player, speedReduction);
                 player.currentSpeed = blockingPlayer.currentSpeed;
                 this.message.setText(`Baulked! Speed reduced to ${player.currentSpeed}.`);
@@ -307,6 +326,7 @@ export class GameScene extends Scene {
                 }
             }
         }
+        return true; // No spin-off, proceed with turn
     }
 
     private processNextCorner(): void {
@@ -331,7 +351,7 @@ export class GameScene extends Scene {
             return;
         }
 
-        if (excessSpeed >= 60 || player.tyreWear >= 8) {
+        if (excessSpeed >= 60 || player.tyreWear >= MAX_TYRE_WEAR) {
             this.spinOff(player, corner);
             return;
         }
@@ -386,8 +406,17 @@ export class GameScene extends Scene {
                 return;
             }
 
-            if (penalty.tyreWear) player.tyreWear += penalty.tyreWear;
-            if (penalty.brakeWear) player.brakeWear += penalty.brakeWear;
+            if (penalty.tyreWear) {
+                if (player.tyreWear >= MAX_TYRE_WEAR) {
+                    this.message.setText(`Rolled ${roll}. Max tyre wear! Spin Off!`);
+                    this.spinOff(player, corner);
+                    return;
+                }
+                player.tyreWear = Math.min(player.tyreWear + penalty.tyreWear, MAX_TYRE_WEAR);
+            }
+            if (penalty.brakeWear) {
+                player.brakeWear = Math.min(player.brakeWear + penalty.brakeWear, MAX_BRAKE_WEAR);
+            }
 
             if (penalty.spinOff) {
                 this.message.setText(`Rolled ${roll}. Spin Off!`);
@@ -431,8 +460,8 @@ export class GameScene extends Scene {
         this.lapText.setText(`${this.numLaps - player.lapsRemaining + 1} / ${this.numLaps}`);
         this.tyreWearText.setText(`${player.tyreWear}`);
         this.brakeWearText.setText(`${player.brakeWear}`);
-        this.tyreWearBar.setProgress(player.tyreWear / 8);
-        this.brakeWearBar.setProgress(player.brakeWear / 8);
+        this.tyreWearBar.setProgress(player.tyreWear / MAX_TYRE_WEAR);
+        this.brakeWearBar.setProgress(player.brakeWear / MAX_BRAKE_WEAR);
 
         this.die1Widget.getContainer().setVisible(this.phase === 'penalty');
         this.die2Widget.getContainer().setVisible(this.phase === 'penalty');
