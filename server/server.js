@@ -7,21 +7,19 @@ const app = express();
 const server = http.createServer(app);
 const io = new Server(server, {
     cors: {
-        origin: "*", // Allow all origins for development
+        origin: "*",
         methods: ["GET", "POST"],
     },
 });
 
 const rooms = {};
 
-// Serve the built game files from the 'dist' directory
 const distPath = path.join(__dirname, "..", "dist");
 app.use(express.static(distPath));
 
 io.on("connection", (socket) => {
     console.log(`User connected: ${socket.id}`);
 
-    // Periodically send the list of available rooms to all connected clients
     const roomInterval = setInterval(() => {
         const roomList = Object.keys(rooms).map((name) => ({
             name,
@@ -30,7 +28,7 @@ io.on("connection", (socket) => {
         socket.emit("roomList", roomList);
     }, 2000);
 
-    socket.on("createRoom", ({ roomName, isPlayer }) => {
+    socket.on("createRoom", ({ roomName, playerName, isPlayer }) => {
         if (rooms[roomName]) {
             return socket.emit("error", "Room with this name already exists.");
         }
@@ -38,7 +36,11 @@ io.on("connection", (socket) => {
             hostId: socket.id,
             players: {},
         };
-        rooms[roomName].players[socket.id] = { id: socket.id, isPlayer };
+        rooms[roomName].players[socket.id] = {
+            id: socket.id,
+            name: playerName,
+            isPlayer,
+        };
         socket.join(roomName);
         console.log(`Room "${roomName}" created by ${socket.id}`);
         socket.emit("roomCreated", {
@@ -47,7 +49,7 @@ io.on("connection", (socket) => {
         });
     });
 
-    socket.on("joinRoom", ({ roomName }) => {
+    socket.on("joinRoom", ({ roomName, playerName }) => {
         const room = rooms[roomName];
         if (!room) {
             return socket.emit("error", "Room not found.");
@@ -56,23 +58,22 @@ io.on("connection", (socket) => {
             return socket.emit("error", "Room is full.");
         }
 
-        // The first player to join is always a player, subsequent can be spectators if they chose so in a more advanced setup.
-        // For now, everyone who joins is a player.
-        room.players[socket.id] = { id: socket.id, isPlayer: true };
+        room.players[socket.id] = {
+            id: socket.id,
+            name: playerName,
+            isPlayer: true,
+        };
         socket.join(roomName);
         console.log(`${socket.id} joined room "${roomName}"`);
 
-        // Notify existing players about the new peer
         socket.to(roomName).emit("newPeer", socket.id);
 
-        // Send room info to the new player
         socket.emit("joinedRoom", {
             roomName,
             hostId: room.hostId,
             players: room.players,
         });
 
-        // Update player list for everyone in the room
         io.to(roomName).emit("playerList", Object.values(room.players));
     });
 
@@ -106,10 +107,9 @@ io.on("connection", (socket) => {
                         `Room "${roomName}" is now empty and has been closed.`
                     );
                 } else if (room.hostId === socket.id) {
-                    // Simple host migration: promote the next player to host
                     const newHostId = Object.keys(room.players)[0];
                     room.hostId = newHostId;
-                    io.to(roomName).emit("newHost", newHostId); // A client-side event you might want to handle
+                    io.to(roomName).emit("newHost", newHostId);
                     console.log(
                         `Host disconnected. New host of room "${roomName}" is ${newHostId}`
                     );
@@ -120,7 +120,6 @@ io.on("connection", (socket) => {
     });
 });
 
-// Fallback to serving the index.html for any request that doesn't match a static file
 app.get("*", (req, res) => {
     res.sendFile(path.join(distPath, "index.html"));
 });

@@ -31,6 +31,7 @@ export class GameLobby extends Scene {
     private phase: LobbyPhase = 'initial';
     private roomName: string = '';
     private players: PlayerInfo[] = [];
+    private playerName: string = '';
 
     // ---------------------------------
     // Networking
@@ -59,13 +60,13 @@ export class GameLobby extends Scene {
         this.network = new Network();
         this.setupUI();
         this.setupNetworkEvents();
+        this.promptForPlayerName();
 
         this.events.on(Phaser.Scenes.Events.SHUTDOWN, this.shutdown, this);
     }
 
     shutdown() {
         console.log("GameLobby shutting down.");
-        // Clean up all event listeners to prevent memory leaks
         EventBus.off('network-connected', this.handleNetworkConnected, this);
         EventBus.off('network-roomList', this.updateRoomList, this);
         EventBus.off('network-room-created', this.handleRoomCreated, this);
@@ -81,7 +82,6 @@ export class GameLobby extends Scene {
 
     private setupUI(): void {
         this.setupGameContainer();
-
         const grid = new GridContainer({ scene: this, cols: 1, rows: 4, width: VIRTUAL.W, height: VIRTUAL.H });
         this.gameContainer.add(grid);
 
@@ -115,7 +115,6 @@ export class GameLobby extends Scene {
     }
 
     private createRoomListWidget(grid: GridContainer): void {
-        // Row 1: full-width room list
         this.roomListWidget = new Widget({
             scene: this,
             width: Math.round(VIRTUAL.W * 0.9),
@@ -129,7 +128,6 @@ export class GameLobby extends Scene {
     }
 
     private createPlayerListWidget(grid: GridContainer): void {
-        // Row 2: full-width player list (visible only when in-room)
         this.playerListWidget = new Widget({
             scene: this,
             width: Math.round(VIRTUAL.W * 0.9),
@@ -143,13 +141,11 @@ export class GameLobby extends Scene {
     }
 
     private createActionWidgets(grid: GridContainer): void {
-        // Create Room button
         this.createRoomButton = new HitboxWidget({ scene: this, width: 300, height: 80, cornerRadius: 15 });
         this.createRoomButton.addText('Create Room', 28, '#ffffff');
         this.createRoomButton.onClick(() => this.handleCreateRoom());
         grid.addItem(this.createRoomButton.getContainer(), { col: 0, row: 2 });
 
-        // Start Game button
         this.startGameButton = new HitboxWidget({ scene: this, width: 300, height: 80, cornerRadius: 15 });
         this.startGameButton.addText('Start Game', 28, '#ffffff');
         this.startGameButton.onClick(() => this.handleStartGame());
@@ -171,13 +167,8 @@ export class GameLobby extends Scene {
     }
 
     private updateUIForPhase(): void {
-        // Room list visible only before joining/creating a room
         this.roomListWidget.getContainer().setVisible(this.phase === 'initial');
-
-        // Player list visible when in a room
         this.playerListWidget.getContainer().setVisible(this.phase === 'in-room');
-
-        // Buttons visibility controlled by phase and host status
         this.createRoomButton.getContainer().setVisible(this.phase === 'initial');
         this.startGameButton.getContainer().setVisible(this.phase === 'in-room' && this.network?.isHost === true);
     }
@@ -202,10 +193,8 @@ export class GameLobby extends Scene {
 
     private updateRoomList(rooms: { name: string, playerCount: number }[]): void {
         if (this.phase !== 'initial') return;
-
         this.roomListWidget.removeAllItems();
         this.roomListWidget.addText("Available Rooms", 32, '#ffffff');
-
         if (rooms.length === 0) {
             this.roomListWidget.addText("No rooms available. Why not create one?", 20, '#cccccc');
         } else {
@@ -240,10 +229,10 @@ export class GameLobby extends Scene {
         this.playerListWidget.removeAllItems();
         this.playerListWidget.addText("Players in Room", 32, '#ffffff');
 
-        this.players.forEach((player, index) => {
+        this.players.forEach((player) => {
             const playerItem = new Widget({ scene: this, width: 560, height: 50, cornerRadius: 10, layout: 'horizontal', padding: 15, backgroundAlpha: 0.2 });
-            const isHost = index === 0;
-            const playerName = `Player ${index + 1}` + (player.id === this.network.localPlayerId ? ' (You)' : '') + (isHost ? ' [Host]' : '');
+            const isHost = this.players[0].id === player.id;
+            const playerName = player.name + (player.id === this.network.localPlayerId ? ' (You)' : '') + (isHost ? ' [Host]' : '');
             playerItem.addText(playerName, 22, isHost ? '#ffff00' : '#ffffff');
             this.playerListWidget.addWidget(playerItem);
         });
@@ -263,15 +252,24 @@ export class GameLobby extends Scene {
     // USER INTERACTION
     // ================================================================================================================
 
+    private promptForPlayerName(): void {
+        const name = prompt("Please enter your name:");
+        if (name) {
+            this.playerName = name;
+        } else {
+            this.playerName = `Player${Math.floor(Math.random() * 1000)}`;
+        }
+    }
+
     private handleCreateRoom(): void {
         const roomName = prompt("Enter a name for your room:");
         if (roomName) {
-            this.network.createRoom(roomName, true);
+            this.network.createRoom(roomName, this.playerName);
         }
     }
 
     private handleJoinRoom(roomName: string): void {
-        this.network.joinRoom(roomName);
+        this.network.joinRoom(roomName, this.playerName);
     }
 
     private handleStartGame(): void {

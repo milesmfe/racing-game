@@ -136,7 +136,7 @@ export class GameScene extends Scene {
             const info = data.players[id];
             const player = new Player(playerIdx) as NetworkPlayer;
             player.socketId = id;
-            player.name = `Player ${playerIdx + 1}`;
+            player.name = info.name;
             player.isPlayer = info.isPlayer;
             player.brakeWear = 0;
             player.tyreWear = 0;
