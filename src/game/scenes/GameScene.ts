@@ -88,7 +88,7 @@ export class GameScene extends Scene {
     private selectedHighlightCircles: Phaser.GameObjects.Arc[] = [];
     private hoveredSpace: { i: number, j: number } | null = null;
     private hoverHighlightCircle: Phaser.GameObjects.Arc | null = null;
-    private selectionCircleRadius: number = 15;
+    private selectionCircleRadius: number = 10;
 
     // ---------------------------------
     // Data Maps
