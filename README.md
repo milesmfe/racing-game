@@ -148,6 +148,32 @@ The server will now be running at `http://localhost:3000`.
 
 To Play: Open `http://localhost:3000` in multiple browser tabs to play the game.
 
+### 3. Production Setup (Background)
+
+This setup runs the final optimized version of the game and serves it directly from the Node.js server running as a background process.
+
+Step 1: Follow Step 1 as usual
+
+Step 2: Instead of starting the server, use `pm2` to manage this process in the backgrond:
+
+```
+# From the project's root directory, run:
+pm2 start npm -- start
+```
+
+You can manage this process with the following comands:
+
+```
+# Check the status
+pm2 list
+
+# Stop the server
+pm2 stop <process-id>
+
+# To see logs
+pm2 logs
+```
+
 ## Project Structure
 
 ```
