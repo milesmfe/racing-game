@@ -3,6 +3,7 @@ import { AUTO, Game } from 'phaser';
 import { Preloader } from './scenes/Preloader';
 import { GameLobby } from './scenes/GameLobby';
 import { GameScene } from './scenes/GameScene';
+import { GameEndScene } from './scenes/GameEndScene';
 
 const config: Phaser.Types.Core.GameConfig = {
     type: AUTO,
@@ -17,7 +18,8 @@ const config: Phaser.Types.Core.GameConfig = {
         Boot,
         Preloader,
         GameLobby,
-        GameScene
+        GameScene,
+        GameEndScene
     ]
 };
 

@@ -490,18 +490,26 @@ export class GameScene extends Scene {
         //     return;
         // }
 
-        let winner = finishedPlayers[0];
-        let maxJ = -1;
-
-        for (const player of finishedPlayers) {
-            if (player.currentPosition.i === 0 && player.currentPosition.j > maxJ) {
-                winner = player;
-                maxJ = player.currentPosition.j;
+        finishedPlayers.sort((a, b) => {
+            if (a.currentPosition.i === 0 && b.currentPosition.i !== 0) return -1;
+            if (b.currentPosition.i === 0 && a.currentPosition.i !== 0) return 1;
+            if (a.currentPosition.i === 0 && b.currentPosition.i === 0) {
+                return b.currentPosition.j - a.currentPosition.j;
             }
-        }
+            return 0;
+        });
 
-        this.message.setText(`${winner.name} wins!`);
+        const winner = finishedPlayers[0];
+        const podiumPlayers = finishedPlayers.slice(0, 3);
+        const podiumData = podiumPlayers.map(p => ({ id: p.id, name: p.name }));
+        const winnerData = { id: winner.id, name: winner.name };
+
+        this.message.setText(`Race finished! ${winner.name} wins!`);
         this.updateAndBroadcastState();
+
+        this.time.delayedCall(3000, () => {
+            this.scene.start('GameEndScene', { winner: winnerData, podiumPlayers: podiumData });
+        });
     }
 
     // ================================================================================================================
