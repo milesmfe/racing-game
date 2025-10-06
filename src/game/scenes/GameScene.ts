@@ -6,24 +6,40 @@ import { Widget, HitboxWidget, TextItem, ProgressBarItem } from '../layout/widge
 import { Network, PlayerInfo } from '../services/Network';
 import { EventBus } from '../EventBus';
 
+// ================================================================================================================
+// CONSTANTS
+// ================================================================================================================
 
 const VIRTUAL = { W: 1920, H: 1080 };
 const MAX_TYRE_WEAR = 8;
 const MAX_BRAKE_WEAR = 5;
 
-type Phase = 'speedselect' | 'moving' | 'penalty' | 'moved' | 'finished' | 'waiting';
+// ================================================================================================================
+// TYPE DEFINITIONS
+// ================================================================================================================
+
+type Phase = 'speedselect' | 'moving' | 'penalty' | 'turn-over' | 'finished' | 'waiting';
 
 type NetworkPlayer = Player & { socketId: string, isPlayer: boolean };
 
-// Define what constitutes a player action that needs to be sent over the network
 type PlayerAction =
     | { type: 'selectSpeed', speed: number }
     | { type: 'confirmMove', steps: { i: number, j: number }[] }
-    | { type: 'rollDie', die: 1 | 2 };
+    | { type: 'rollDie', die: 1 | 2 }
+    | { type: 'endTurn' };
 
+// ================================================================================================================
+// GAME SCENE
+// ================================================================================================================
 
 export class GameScene extends Scene {
+    // ================================================================================================================
+    // CLASS PROPERTIES
+    // ================================================================================================================
+
+    // ---------------------------------
     // Game State
+    // ---------------------------------
     private players: NetworkPlayer[] = [];
     private numLaps: number = 3;
     private phase: Phase = 'waiting';
@@ -34,18 +50,25 @@ export class GameScene extends Scene {
     private cornerPenaltyContext: { player: NetworkPlayer, excessSpeed: number, corner: { i: number, j: number } } | null = null;
     private cornersToResolve: { i: number, j: number }[] = [];
 
+    // ---------------------------------
     // Networking
+    // ---------------------------------
     private network!: Network;
     private localPlayerId!: string;
 
+    // ---------------------------------
     // Game Objects
+    // ---------------------------------
     private gameContainer!: Phaser.GameObjects.Container;
     private trackImage!: Phaser.GameObjects.Image;
     private playerImages: Map<string, Phaser.GameObjects.Image> = new Map();
 
+    // ---------------------------------
     // UI Elements
+    // ---------------------------------
     private message!: TextItem;
     private confirmMoveButton!: HitboxWidget;
+    private endTurnButton!: HitboxWidget;
     private die1Widget!: HitboxWidget;
     private die2Widget!: HitboxWidget;
     private die1Text!: TextItem;
@@ -57,7 +80,9 @@ export class GameScene extends Scene {
     private lapText!: TextItem;
     private speedSelectorWidget!: HitboxWidget;
 
+    // ---------------------------------
     // Player Interaction
+    // ---------------------------------
     private stepSpaces: { i: number, j: number }[] = [];
     private availableSpaces: { i: number, j: number }[] = [];
     private selectedHighlightCircles: Phaser.GameObjects.Arc[] = [];
@@ -65,6 +90,9 @@ export class GameScene extends Scene {
     private hoverHighlightCircle: Phaser.GameObjects.Arc | null = null;
     private selectionCircleRadius: number = 15;
 
+    // ---------------------------------
+    // Data Maps
+    // ---------------------------------
     private startingPositionMap: Record<number, { i: number, j: number }> = {
         0: { i: 0, j: 6 }, 1: { i: 0, j: 5 }, 2: { i: 0, j: 4 },
         3: { i: 0, j: 3 }, 4: { i: 0, j: 2 }, 5: { i: 0, j: 1 }
@@ -74,6 +102,10 @@ export class GameScene extends Scene {
         0: { i: 2, j: 0 }, 1: { i: 1, j: 0 }, 2: { i: 0, j: 0 },
         3: { i: 64, j: 0 }, 4: { i: 63, j: 0 }, 5: { i: 62, j: 0 }
     };
+
+    // ================================================================================================================
+    // GETTERS
+    // ================================================================================================================
 
     private get trackData(): TrackData {
         return this.cache.json.get('track-data') as TrackData;
@@ -87,13 +119,13 @@ export class GameScene extends Scene {
         return this.currentPlayer?.socketId === this.localPlayerId;
     }
 
-    constructor() {
-        super('GameScene');
-    }
-
     // ================================================================================================================
     // PHASER SCENE LIFECYCLE
     // ================================================================================================================
+
+    constructor() {
+        super('GameScene');
+    }
 
     init(data: { network: Network, players: { [id: string]: PlayerInfo } }) {
         this.network = data.network;
@@ -133,110 +165,6 @@ export class GameScene extends Scene {
         EventBus.off('gameStateUpdate', this.applyGameState, this);
         this.input.off('pointermove');
         this.input.off('pointerdown');
-    }
-
-    // ================================================================================================================
-    // NETWORK & GAME START
-    // ================================================================================================================
-
-    private startHost() {
-        console.log("Starting scene as HOST");
-        EventBus.on('clientAction', this.handleClientAction, this);
-        // Add a small delay to ensure peer connections have time to establish before the first broadcast
-        this.time.delayedCall(500, this.startMove, [], this);
-    }
-
-    private startClient() {
-        console.log("Starting scene as CLIENT");
-        EventBus.on('gameStateUpdate', this.applyGameState, this);
-    }
-
-    private handleClientAction({ from, action }: { from: string, action: PlayerAction }) {
-        if (!this.network.isHost || this.currentPlayer?.socketId !== from) {
-            console.warn(`Ignoring action from ${from}. It's player ${this.currentPlayer?.socketId}'s turn.`);
-            return;
-        }
-
-        // Host executes the action received from a client
-        switch (action.type) {
-            case 'selectSpeed':
-                this.selectSpeed(action.speed, true);
-                break;
-            case 'confirmMove':
-                this.stepSpaces = action.steps;
-                this.confirmMove(true);
-                break;
-            case 'rollDie':
-                this.rollDie(action.die, true);
-                break;
-        }
-    }
-
-    private updateAndBroadcastState() {
-        if (!this.network.isHost) return;
-
-        // **FIX:** Create a plain object representation of players for serialization
-        const playersData = this.players.map(p => ({
-            id: p.id,
-            name: p.name,
-            roll: p.roll,
-            rollOrder: p.rollOrder,
-            currentPosition: p.currentPosition,
-            currentSpeed: p.currentSpeed,
-            lapsRemaining: p.lapsRemaining,
-            tyreWear: p.tyreWear,
-            brakeWear: p.brakeWear,
-            socketId: p.socketId,
-            isPlayer: p.isPlayer,
-        }));
-
-        const state = {
-            players: playersData, // Send plain objects
-            phase: this.phase,
-            currentPlayerIndex: this.currentPlayerIndex,
-            requiredSteps: this.requiredSteps,
-            die1Result: this.die1Result,
-            die2Result: this.die2Result,
-            stepSpaces: this.stepSpaces,
-            availableSpaces: this.availableSpaces,
-        };
-
-        // Apply to self first to ensure host UI is in sync
-        this.applyGameState(state);
-
-        // Then broadcast to all connected peers
-        this.network.broadcastToPeers('gameStateUpdate', state);
-    }
-
-    private applyGameState(state: any) {
-        // **FIX:** Merge received plain object data into existing class instances
-        if (state.players) {
-            state.players.forEach((playerData: any) => {
-                const player = this.players.find(p => p.socketId === playerData.socketId);
-                if (player) {
-                    Object.assign(player, playerData);
-                }
-            });
-        }
-
-        this.phase = state.phase;
-        this.currentPlayerIndex = state.currentPlayerIndex;
-        this.requiredSteps = state.requiredSteps;
-        this.die1Result = state.die1Result;
-        this.die2Result = state.die2Result;
-        this.availableSpaces = state.availableSpaces || [];
-
-        // Update visuals
-        this.players.forEach(p => {
-            if (p.isPlayer) this.placePlayerOnTrack(p.id, p.currentPosition);
-        });
-
-        this.selectedHighlightCircles.forEach(c => c.destroy());
-        this.selectedHighlightCircles = [];
-        state.stepSpaces.forEach((space: any) => this.createSelectedHighlight(space));
-        this.stepSpaces = state.stepSpaces;
-
-        this.updateUI();
     }
 
     // ================================================================================================================
@@ -295,6 +223,7 @@ export class GameScene extends Scene {
         this.createSpeedSelector(grid);
         this.createMessageBox(grid);
         this.createConfirmMoveButton(grid);
+        this.createEndTurnButton(grid);
     }
 
     private setupInputHandlers(): void {
@@ -303,9 +232,97 @@ export class GameScene extends Scene {
     }
 
     // ================================================================================================================
+    // NETWORK & GAME START
+    // ================================================================================================================
+
+    private startHost() {
+        console.log("Starting scene as HOST");
+        EventBus.on('clientAction', this.handleClientAction, this);
+        this.time.delayedCall(500, this.startTurn, [], this);
+    }
+
+    private startClient() {
+        console.log("Starting scene as CLIENT");
+        EventBus.on('gameStateUpdate', this.applyGameState, this);
+    }
+
+    private handleClientAction({ from, action }: { from: string, action: PlayerAction }) {
+        if (!this.network.isHost || this.currentPlayer?.socketId !== from) {
+            console.warn(`Ignoring action from ${from}. It's player ${this.currentPlayer?.socketId}'s turn.`);
+            return;
+        }
+
+        switch (action.type) {
+            case 'selectSpeed':
+                this.selectSpeed(action.speed, true);
+                break;
+            case 'confirmMove':
+                this.stepSpaces = action.steps;
+                this.confirmMove(true);
+                break;
+            case 'rollDie':
+                this.rollDie(action.die, true);
+                break;
+            case 'endTurn':
+                this.endTurn(true);
+                break;
+        }
+    }
+
+    private updateAndBroadcastState() {
+        if (!this.network.isHost) return;
+
+        const playersData = this.players.map(p => ({ ...p }));
+
+        const state = {
+            players: playersData,
+            phase: this.phase,
+            currentPlayerIndex: this.currentPlayerIndex,
+            requiredSteps: this.requiredSteps,
+            die1Result: this.die1Result,
+            die2Result: this.die2Result,
+            stepSpaces: this.stepSpaces,
+            availableSpaces: this.availableSpaces,
+        };
+
+        this.applyGameState(state);
+        this.network.broadcastToPeers('gameStateUpdate', state);
+    }
+
+    private applyGameState(state: any) {
+        if (state.players) {
+            state.players.forEach((playerData: any) => {
+                const player = this.players.find(p => p.socketId === playerData.socketId);
+                if (player) {
+                    Object.assign(player, playerData);
+                }
+            });
+        }
+
+        this.phase = state.phase;
+        this.currentPlayerIndex = state.currentPlayerIndex;
+        this.requiredSteps = state.requiredSteps;
+        this.die1Result = state.die1Result;
+        this.die2Result = state.die2Result;
+        this.availableSpaces = state.availableSpaces || [];
+
+        this.players.forEach(p => {
+            if (p.isPlayer) this.placePlayerOnTrack(p.id, p.currentPosition);
+        });
+
+        this.selectedHighlightCircles.forEach(c => c.destroy());
+        this.selectedHighlightCircles = [];
+        state.stepSpaces.forEach((space: any) => this.createSelectedHighlight(space));
+        this.stepSpaces = state.stepSpaces;
+
+        this.updateUI();
+    }
+
+    // ================================================================================================================
     // GAME STATE MANAGEMENT
     // ================================================================================================================
-    private startMove(): void {
+
+    private startTurn(): void {
         if (!this.network.isHost) return;
 
         const racingPlayers = this.players.filter(p => p.isPlayer);
@@ -336,7 +353,6 @@ export class GameScene extends Scene {
 
         this.currentPlayerIndex = nextPlayerIndex;
         this.phase = 'speedselect';
-
         this.updateAndBroadcastState();
     }
 
@@ -353,12 +369,13 @@ export class GameScene extends Scene {
             return;
         }
 
-        // HOST-ONLY LOGIC
         const player = this.currentPlayer!;
         const speedChange = speed - player.currentSpeed;
 
         if (speedChange > 60) {
-            this.startMove();
+            this.message.setText("Invalid speed change. Please select another speed.");
+            this.phase = 'speedselect';
+            this.updateAndBroadcastState();
             return;
         }
 
@@ -395,7 +412,6 @@ export class GameScene extends Scene {
             return;
         }
 
-        // HOST-ONLY LOGIC
         if (this.isBaulked()) {
             if (!this.handleBaulking()) return;
         }
@@ -418,6 +434,7 @@ export class GameScene extends Scene {
             if (finalPosition.i === playerPitStop.i && finalPosition.j === playerPitStop.j) {
                 player.brakeWear = 0;
                 player.tyreWear = 0;
+                player.currentSpeed = 0;
             }
 
             player.currentPosition = finalPosition;
@@ -425,8 +442,24 @@ export class GameScene extends Scene {
 
         this.stepSpaces = [];
         this.availableSpaces = [];
-        this.phase = 'moved';
-        this.startMove();
+        this.phase = 'turn-over';
+        this.updateAndBroadcastState();
+    }
+
+    private endTurn(fromNetworkOrHost: boolean = false): void {
+        if (!fromNetworkOrHost) {
+            if (!this.isMyTurn || this.phase !== 'turn-over') return;
+            if (this.network.isHost) {
+                this.endTurn(true);
+            } else {
+                this.network.sendToHost('clientAction', { action: { type: 'endTurn' } });
+                this.phase = 'waiting';
+                this.updateUI();
+            }
+            return;
+        }
+
+        this.startTurn();
     }
 
     // ================================================================================================================
@@ -480,9 +513,6 @@ export class GameScene extends Scene {
         this.availableSpaces = this.findSelectableSpaces(prev, false);
     }
 
-    // ================================================================================================================
-    // GAME RULES & MECHANICS (HOST ONLY)
-    // ================================================================================================================
     private rollDie(die: 1 | 2, fromNetworkOrHost: boolean = false): void {
         if (!fromNetworkOrHost) {
             if (!this.isMyTurn || this.phase !== 'penalty') return;
@@ -494,7 +524,6 @@ export class GameScene extends Scene {
             return;
         }
 
-        // HOST-ONLY LOGIC
         const roll = Phaser.Math.Between(1, 6);
         if (die === 1 && this.die1Result === null) this.die1Result = roll;
         else if (die === 2 && this.die2Result === null) this.die2Result = roll;
@@ -505,6 +534,10 @@ export class GameScene extends Scene {
             this.updateAndBroadcastState();
         }
     }
+
+    // ================================================================================================================
+    // GAME RULES & MECHANICS (HOST ONLY)
+    // ================================================================================================================
 
     private calculatePenalty(d1: number, d2: number): void {
         if (!this.cornerPenaltyContext) return;
@@ -528,8 +561,7 @@ export class GameScene extends Scene {
             if (penalty.spinOff) { this.spinOff(player, corner); return; }
         }
 
-        this.time.delayedCall(1500, this.processNextCorner, [], this);
-        this.updateAndBroadcastState();
+        this.processNextCorner();
     }
 
     private spinOff(player: NetworkPlayer, cornerPosition: { i: number, j: number }): void {
@@ -537,12 +569,10 @@ export class GameScene extends Scene {
         const spinOffSpace = this.findNearestSpinOffSpace(cornerPosition);
         if (spinOffSpace) player.currentPosition = spinOffSpace;
         this.cornersToResolve = [];
-        this.time.delayedCall(1500, () => {
-            this.stepSpaces = [];
-            this.availableSpaces = [];
-            this.phase = 'moved';
-            this.startMove();
-        }, [], this);
+        this.stepSpaces = [];
+        this.availableSpaces = [];
+        this.phase = 'turn-over';
+        this.updateAndBroadcastState();
     }
 
     private handleBaulking(): boolean {
@@ -609,7 +639,7 @@ export class GameScene extends Scene {
     }
 
     // ================================================================================================================
-    // UI & VISUALS (CLIENT & HOST)
+    // UI & VISUALS
     // ================================================================================================================
 
     private updateUI(): void {
@@ -619,7 +649,6 @@ export class GameScene extends Scene {
         if (player) {
             this.lapText.setText(`${this.numLaps - player.lapsRemaining + 1} / ${this.numLaps}`);
         }
-        // Show wear for the local player always
         if (localPlayer) {
             this.tyreWearText.setText(`${localPlayer.tyreWear}`);
             this.brakeWearText.setText(`${localPlayer.brakeWear}`);
@@ -632,6 +661,7 @@ export class GameScene extends Scene {
         this.confirmMoveButton.getContainer().setVisible(this.phase === 'moving' && (this.stepSpaces.length === this.requiredSteps || this.isBaulked())).setAlpha(canInteract ? 1 : 0.5);
         this.die1Widget.getContainer().setVisible(this.phase === 'penalty').setAlpha(canInteract && this.die1Result === null ? 1 : 0.5);
         this.die2Widget.getContainer().setVisible(this.phase === 'penalty').setAlpha(canInteract && this.die2Result === null ? 1 : 0.5);
+        this.endTurnButton.getContainer().setVisible(this.phase === 'turn-over').setAlpha(canInteract ? 1 : 0.5);
 
         this.die1Text.setText(this.die1Result?.toString() ?? '?');
         this.die2Text.setText(this.die2Result?.toString() ?? '?');
@@ -645,6 +675,7 @@ export class GameScene extends Scene {
                     case 'speedselect': messageStr = "Your turn: Select your speed."; break;
                     case 'moving': messageStr = `Your turn: Move ${this.stepSpaces.length}/${this.requiredSteps} spaces.`; break;
                     case 'penalty': messageStr = "Your turn: Roll for corner penalty."; break;
+                    case 'turn-over': messageStr = "Click to end turn."; break;
                     case 'waiting': messageStr = "Waiting for server..."; break;
                 }
             } else {
@@ -676,11 +707,47 @@ export class GameScene extends Scene {
     }
 
     // ================================================================================================================
-    // HELPER & UTILITY METHODS
+    // UI COMPONENT CREATION
     // ================================================================================================================
 
-    private getOccupyingPlayer(i: number, j: number): NetworkPlayer | null {
-        return this.players.find(p => p.currentPosition.i === i && p.currentPosition.j === j) ?? null;
+    private createLapIndicator(grid: GridContainer): void {
+        const lapIndicator = new Widget({ scene: this, width: 120, height: 120, cornerRadius: 20, layout: 'vertical', padding: 8 });
+        lapIndicator.addText('Lap', 18, '#ffffff');
+        this.lapText = lapIndicator.addText(`1 / ${this.numLaps}`, 28, '#ffff00');
+        grid.addItem(lapIndicator.getContainer(), { col: 3, row: 6, colSpan: 2, rowSpan: 2 });
+    }
+
+    private createDiceWidgets(grid: GridContainer): void {
+        this.die1Widget = new HitboxWidget({ scene: this, width: 120, height: 120, cornerRadius: 20, layout: 'vertical', padding: 8 });
+        this.die1Widget.addText('Dice 1', 18, '#ccc');
+        this.die1Text = this.die1Widget.addText('?', 36, '#ffff00');
+        this.die1Widget.onClick(() => this.rollDie(1));
+        grid.addItem(this.die1Widget.getContainer(), { col: 2, row: 9, colSpan: 2, rowSpan: 2 });
+        this.die2Widget = new HitboxWidget({ scene: this, width: 120, height: 120, cornerRadius: 20, layout: 'vertical', padding: 8 });
+        this.die2Widget.addText('Dice 2', 18, '#ccc');
+        this.die2Text = this.die2Widget.addText('?', 36, '#ffff00');
+        this.die2Widget.onClick(() => this.rollDie(2));
+        grid.addItem(this.die2Widget.getContainer(), { col: 4, row: 9, colSpan: 2, rowSpan: 2 });
+    }
+
+    private createWearIndicators(grid: GridContainer): void {
+        const tireWidget = new Widget({ scene: this, width: 240, height: 120, cornerRadius: 20, layout: 'vertical', padding: 8 });
+        tireWidget.addText('Tire Wear', 16, '#fff');
+        this.tyreWearText = tireWidget.addText('0', 16, '#ffff00');
+        this.tyreWearBar = tireWidget.addProgressBar(0);
+        grid.addItem(tireWidget.getContainer(), { col: 2, row: 14, colSpan: 4, rowSpan: 2 });
+        const brakeWidget = new Widget({ scene: this, width: 240, height: 120, cornerRadius: 20, layout: 'vertical', padding: 8 });
+        brakeWidget.addText('Brake Wear', 16, '#fff');
+        this.brakeWearText = brakeWidget.addText('0', 16, '#ffff00');
+        this.brakeWearBar = brakeWidget.addProgressBar(0);
+        grid.addItem(brakeWidget.getContainer(), { col: 26, row: 14, colSpan: 4, rowSpan: 2 });
+    }
+
+    private createMessageBox(grid: GridContainer): void {
+        const messageBox = new Widget({ scene: this, width: 500, height: 60, layout: 'horizontal', padding: 8, backgroundAlpha: 0 });
+        this.message = messageBox.addText("", 24, '#ffff00');
+        messageBox.getContainer().setDepth(99);
+        grid.addItem(messageBox.getContainer(), { col: 13, row: 17, colSpan: 7, rowSpan: 1 });
     }
 
     private createSpeedSelector(grid: GridContainer): void {
@@ -691,6 +758,30 @@ export class GameScene extends Scene {
         grid.addItem(this.speedSelectorWidget.getContainer(), { col: 7, row: 14, colSpan: 18, rowSpan: 2 });
     }
 
+    private createConfirmMoveButton(grid: GridContainer): void {
+        this.confirmMoveButton = new HitboxWidget({ scene: this, width: 240, height: 60, cornerRadius: 20, layout: 'horizontal', padding: 8 });
+        this.confirmMoveButton.addText('Confirm Move', 24, '#ffffff');
+        this.confirmMoveButton.onClick(() => this.confirmMove());
+        this.confirmMoveButton.getContainer().setVisible(false);
+        grid.addItem(this.confirmMoveButton.getContainer(), { col: 15, row: 7, colSpan: 4, rowSpan: 1 });
+    }
+
+    private createEndTurnButton(grid: GridContainer): void {
+        this.endTurnButton = new HitboxWidget({ scene: this, width: 240, height: 60, cornerRadius: 20, layout: 'horizontal', padding: 8 });
+        this.endTurnButton.addText('End Turn', 24, '#ffffff');
+        this.endTurnButton.onClick(() => this.endTurn());
+        this.endTurnButton.getContainer().setVisible(false);
+        grid.addItem(this.endTurnButton.getContainer(), { col: 15, row: 7, colSpan: 4, rowSpan: 1 });
+    }
+
+    // ================================================================================================================
+    // HELPER & UTILITY METHODS
+    // ================================================================================================================
+
+    private getOccupyingPlayer(i: number, j: number): NetworkPlayer | null {
+        return this.players.find(p => p.currentPosition.i === i && p.currentPosition.j === j) ?? null;
+    }
+
     private createHoverHighlight(space: { i: number, j: number }): void {
         const coords = this.getCoordinates(space.i, space.j);
         if (!coords) return;
@@ -698,6 +789,7 @@ export class GameScene extends Scene {
         this.hoverHighlightCircle = this.add.circle(pos.x, pos.y, this.selectionCircleRadius, 0xffff00, 0.5).setDepth(100);
         this.gameContainer.add(this.hoverHighlightCircle);
     }
+
     private createSelectedHighlight(space: { i: number, j: number }): void {
         const coords = this.getCoordinates(space.i, space.j);
         if (!coords) return;
@@ -706,20 +798,24 @@ export class GameScene extends Scene {
         this.gameContainer.add(toHighlight);
         this.selectedHighlightCircles.push(toHighlight);
     }
+
     private getLocalPointerPosition(pointer: Phaser.Input.Pointer): { x: number, y: number } {
         const local = new Phaser.Math.Vector2();
         this.gameContainer.getWorldTransformMatrix().invert().transformPoint(pointer.x, pointer.y, local);
         return { x: local.x, y: local.y };
     }
+
     private isSpaceAvailable(space: { i: number, j: number }): boolean {
         return this.availableSpaces.some(s => s.i === space.i && s.j === space.j);
     }
+
     private isBaulked(): boolean {
         if (!this.currentPlayer) return false;
         const lastPos = this.stepSpaces[this.stepSpaces.length - 1] || this.currentPlayer.currentPosition;
         const available = this.findSelectableSpaces(lastPos, true);
         return available.length > 0 && available.every(s => this.getOccupyingPlayer(s.i, s.j) !== null);
     }
+
     private findNearestValidSpace(pos: { x: number, y: number }): { i: number, j: number } | null {
         let closest: { i: number, j: number } | null = null;
         let closestDist = Infinity;
@@ -737,6 +833,7 @@ export class GameScene extends Scene {
         }
         return closestDist > 30 ? null : closest;
     }
+
     private findNearestSpinOffSpace(pos: { i: number, j: number }): { i: number, j: number } | null {
         let closest: { i: number, j: number } | null = null;
         let closestDist = Infinity;
@@ -753,22 +850,27 @@ export class GameScene extends Scene {
         }
         return closest;
     }
+
     private didCrossFinishLine(startPos: { i: number, j: number }, endPos: { i: number, j: number }): boolean {
         return startPos.i > 0 && endPos.i === 0;
     }
+
     private trackImageToContainer(x: number, y: number): { x: number, y: number } {
         const { displayWidth, displayHeight, scaleX, scaleY, originX, originY, x: imgX, y: imgY } = this.trackImage;
         const topLeftLocalX = imgX - (originX ?? 0.5) * displayWidth;
         const topLeftLocalY = imgY - (originY ?? 0.5) * displayHeight;
         return { x: topLeftLocalX + x * scaleX, y: topLeftLocalY + y * scaleY };
     }
+
     getCoordinates(i: number, j: number): { x: number, y: number } | null {
         const coords = this.trackData.coordinates[i]?.[j];
         return coords ? { x: coords[0], y: coords[1] } : null;
     }
+
     getTopography(i: number, j: number): number | null {
         return this.trackData.topography[i]?.[j] ?? null;
     }
+
     findSelectableSpaces(current: { i: number; j: number }, ignoreOccupied: boolean): { i: number; j: number }[] {
         const results: { i: number; j: number }[] = [];
         const directions = [
@@ -804,48 +906,5 @@ export class GameScene extends Scene {
             }
         }
         return results;
-    }
-    private createLapIndicator(grid: GridContainer): void {
-        const lapIndicator = new Widget({ scene: this, width: 120, height: 120, cornerRadius: 20, layout: 'vertical', padding: 8 });
-        lapIndicator.addText('Lap', 18, '#ffffff');
-        this.lapText = lapIndicator.addText(`1 / ${this.numLaps}`, 28, '#ffff00');
-        grid.addItem(lapIndicator.getContainer(), { col: 3, row: 6, colSpan: 2, rowSpan: 2 });
-    }
-    private createDiceWidgets(grid: GridContainer): void {
-        this.die1Widget = new HitboxWidget({ scene: this, width: 120, height: 120, cornerRadius: 20, layout: 'vertical', padding: 8 });
-        this.die1Widget.addText('Dice 1', 18, '#ccc');
-        this.die1Text = this.die1Widget.addText('?', 36, '#ffff00');
-        this.die1Widget.onClick(() => this.rollDie(1));
-        grid.addItem(this.die1Widget.getContainer(), { col: 2, row: 9, colSpan: 2, rowSpan: 2 });
-        this.die2Widget = new HitboxWidget({ scene: this, width: 120, height: 120, cornerRadius: 20, layout: 'vertical', padding: 8 });
-        this.die2Widget.addText('Dice 2', 18, '#ccc');
-        this.die2Text = this.die2Widget.addText('?', 36, '#ffff00');
-        this.die2Widget.onClick(() => this.rollDie(2));
-        grid.addItem(this.die2Widget.getContainer(), { col: 4, row: 9, colSpan: 2, rowSpan: 2 });
-    }
-    private createWearIndicators(grid: GridContainer): void {
-        const tireWidget = new Widget({ scene: this, width: 240, height: 120, cornerRadius: 20, layout: 'vertical', padding: 8 });
-        tireWidget.addText('Tire Wear', 16, '#fff');
-        this.tyreWearText = tireWidget.addText('0', 16, '#ffff00');
-        this.tyreWearBar = tireWidget.addProgressBar(0);
-        grid.addItem(tireWidget.getContainer(), { col: 2, row: 14, colSpan: 4, rowSpan: 2 });
-        const brakeWidget = new Widget({ scene: this, width: 240, height: 120, cornerRadius: 20, layout: 'vertical', padding: 8 });
-        brakeWidget.addText('Brake Wear', 16, '#fff');
-        this.brakeWearText = brakeWidget.addText('0', 16, '#ffff00');
-        this.brakeWearBar = brakeWidget.addProgressBar(0);
-        grid.addItem(brakeWidget.getContainer(), { col: 26, row: 14, colSpan: 4, rowSpan: 2 });
-    }
-    private createMessageBox(grid: GridContainer): void {
-        const messageBox = new Widget({ scene: this, width: 500, height: 60, layout: 'horizontal', padding: 8, backgroundAlpha: 0 });
-        this.message = messageBox.addText("", 24, '#ffff00');
-        messageBox.getContainer().setDepth(99);
-        grid.addItem(messageBox.getContainer(), { col: 13, row: 17, colSpan: 7, rowSpan: 1 });
-    }
-    private createConfirmMoveButton(grid: GridContainer): void {
-        this.confirmMoveButton = new HitboxWidget({ scene: this, width: 240, height: 60, cornerRadius: 20, layout: 'horizontal', padding: 8 });
-        this.confirmMoveButton.addText('Confirm Move', 24, '#ffffff');
-        this.confirmMoveButton.onClick(() => this.confirmMove());
-        this.confirmMoveButton.getContainer().setVisible(false);
-        grid.addItem(this.confirmMoveButton.getContainer(), { col: 15, row: 7, colSpan: 4, rowSpan: 1 });
     }
 }
