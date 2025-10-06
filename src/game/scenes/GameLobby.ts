@@ -1,231 +1,280 @@
 import { Scene } from 'phaser';
-import { Player } from '../Player';
-import { GameSetup } from '../GameSetup';
-import { Widget, HitboxWidget, WidgetItem, TextItem } from '../layout/widgets';
+import { Network, PlayerInfo } from '../services/Network';
+import { EventBus } from '../EventBus';
+import { GridContainer } from '../layout/grid';
+import { Widget, HitboxWidget, TextItem } from '../layout/widgets';
 
-type Phase = 'add' | 'roll' | 'done';
+// ================================================================================================================
+// CONSTANTS
+// ================================================================================================================
 
-const CONFIG = {
-    MAX_PLAYERS: 6,
-    VIRTUAL_DIMENSIONS: { W: 1920, H: 1080 },
-    PLAYER_BOX: { W: 160, H: 220 },
-    CAR_SCALE: 0.05,
-    TWEENS: {
-        BUTTON_CLICK: { scale: 0.95, duration: 80, yoyo: true }
-    },
-    PALETTE: {
-        CARS: ['yellow-car', 'orange-car', 'green-car', 'red-car', 'gray-car', 'purple-car'],
-    }
-};
+const VIRTUAL = { W: 1920, H: 1080 };
+
+// ================================================================================================================
+// TYPE DEFINITIONS
+// ================================================================================================================
+
+type LobbyPhase = 'initial' | 'in-room';
+
+// ================================================================================================================
+// GAME LOBBY SCENE
+// ================================================================================================================
 
 export class GameLobby extends Scene {
-    private players: Player[] = [];
-    private numLaps = 3;
-    private phase: Phase = 'add';
-    private rollIndex = 0;
+    // ================================================================================================================
+    // CLASS PROPERTIES
+    // ================================================================================================================
 
-    private rootWidget!: Widget;
-    private playerWidget!: Widget;
+    // ---------------------------------
+    // State
+    // ---------------------------------
+    private phase: LobbyPhase = 'initial';
+    private roomName: string = '';
+    private players: PlayerInfo[] = [];
+    private playerName: string = '';
 
-    private activePromptItem: TextItem | null = null;
-    private activeButtonItem: WidgetItem | null = null;
+    // ---------------------------------
+    // Networking
+    // ---------------------------------
+    private network!: Network;
+
+    // ---------------------------------
+    // UI Elements
+    // ---------------------------------
+    private gameContainer!: Phaser.GameObjects.Container;
+    private roomListWidget!: Widget;
+    private playerListWidget!: Widget;
+    private createRoomButton!: HitboxWidget;
+    private startGameButton!: HitboxWidget;
+    private messageText!: TextItem;
+
+    // ================================================================================================================
+    // PHASER SCENE LIFECYCLE
+    // ================================================================================================================
 
     constructor() {
-        super({ key: 'GameLobby' });
+        super('GameLobby');
     }
 
     create() {
-        this.reset();
+        this.network = new Network();
         this.setupUI();
-        this.updateUI();
-        this.scale.on('resize', this.onResize, this);
-        this.onResize();
+        this.setupNetworkEvents();
+        this.promptForPlayerName();
+
+        this.events.on(Phaser.Scenes.Events.SHUTDOWN, this.shutdown, this);
     }
 
-    private reset() {
-        this.players = [];
-        this.phase = 'add';
-        this.rollIndex = 0;
+    shutdown() {
+        console.log("GameLobby shutting down.");
+        EventBus.off('network-connected', this.handleNetworkConnected, this);
+        EventBus.off('network-roomList', this.updateRoomList, this);
+        EventBus.off('network-room-created', this.handleRoomCreated, this);
+        EventBus.off('network-joined-room', this.handleJoinedRoom, this);
+        EventBus.off('network-playerList', this.updatePlayerList, this);
+        EventBus.off('game-start', this.handleGameStart, this);
+        EventBus.off('network-error', this.handleNetworkError, this);
     }
 
-    private findNextAvailableId(): number {
-        const existingIds = new Set(this.players.map(p => p.id));
-        let nextId = 0;
-        while (existingIds.has(nextId)) { nextId++; }
-        return nextId;
+    // ================================================================================================================
+    // UI SETUP
+    // ================================================================================================================
+
+    private setupUI(): void {
+        this.setupGameContainer();
+        const grid = new GridContainer({ scene: this, cols: 1, rows: 4, width: VIRTUAL.W, height: VIRTUAL.H });
+        this.gameContainer.add(grid);
+
+        this.createTitle(grid);
+        this.createRoomListWidget(grid);
+        this.createPlayerListWidget(grid);
+        this.createActionWidgets(grid);
+        this.createMessageBox(grid);
+
+        this.updateUIForPhase();
     }
 
-    private handleAddPlayer = () => {
-        if (this.players.length >= CONFIG.MAX_PLAYERS) return;
-        const newId = this.findNextAvailableId();
-        const player = new Player(newId);
-        player.name = `Player ${newId + 1}`;
-        this.players.push(player);
-        this.updateUI();
-    };
-
-    private handleRemovePlayer = (playerId: number) => {
-        this.players = this.players.filter(p => p.id !== playerId);
-        this.players.forEach((player, index) => {
-            player.id = index;
-            player.name = `Player ${index + 1}`;
-        });
-        this.updateUI();
-    };
-
-    private handleRollForPosition = () => {
-        if (this.players.length < 2) return;
-        this.phase = 'roll';
-        this.updateUI();
-    };
-
-    private handleRollDice = () => {
-        const roll = Phaser.Math.Between(1, 6) + Phaser.Math.Between(1, 6);
-        this.players[this.rollIndex].roll = roll;
-        this.rollIndex++;
-        if (this.rollIndex >= this.players.length) {
-            this.assignStartOrder();
-            this.phase = 'done';
-        }
-        this.updateUI();
-    };
-
-    private handleStartGame = () => {
-        if (this.phase !== 'done' || this.players.length === 0) return;
-        const gameSetup: GameSetup = { numLaps: this.numLaps, players: this.players };
-        this.scene.start('GameScene', gameSetup);
-    };
-
-    private assignStartOrder() {
-        const sortedPlayers = [...this.players].sort((a, b) => (b.roll ?? 0) - (a.roll ?? 0));
-        sortedPlayers.forEach((player, index) => { player.rollOrder = index; });
+    private setupGameContainer(): void {
+        this.gameContainer = this.add.container(0, 0);
+        this.gameContainer.setSize(VIRTUAL.W, VIRTUAL.H);
+        const resizeContainer = () => {
+            const { width, height } = this.scale.gameSize;
+            const scale = Math.min(width / VIRTUAL.W, height / VIRTUAL.H);
+            this.gameContainer.setScale(scale);
+            this.gameContainer.x = (width - VIRTUAL.W * scale) / 2;
+            this.gameContainer.y = (height - VIRTUAL.H * scale) / 2;
+        };
+        resizeContainer();
+        this.scale.on('resize', resizeContainer);
     }
 
-    private setupUI() {
-        const { W, H } = CONFIG.VIRTUAL_DIMENSIONS;
+    private createTitle(grid: GridContainer): void {
+        const titleWidget = new Widget({ scene: this, width: VIRTUAL.W, height: VIRTUAL.H / 6, backgroundAlpha: 0 });
+        titleWidget.addText("Formula One", 64, '#ffffff');
+        grid.addItem(titleWidget.getContainer(), { col: 0, row: 0 });
+    }
 
-        this.rootWidget = new Widget({
+    private createRoomListWidget(grid: GridContainer): void {
+        this.roomListWidget = new Widget({
             scene: this,
-            width: W, height: H,
+            width: Math.round(VIRTUAL.W * 0.9),
+            height: Math.round(VIRTUAL.H * 0.38),
+            cornerRadius: 20,
             layout: 'vertical',
-            padding: 50,
-            backgroundAlpha: 0
+            padding: 16
         });
+        this.roomListWidget.addText("Available Rooms", 32, '#ffffff');
+        grid.addItem(this.roomListWidget.getContainer(), { col: 0, row: 1 });
+    }
 
-        this.rootWidget.addText('Lobby', 50, '#ffffff');
-
-        const playerWidgetWidth = (CONFIG.PLAYER_BOX.W + 20) * CONFIG.MAX_PLAYERS;
-        this.playerWidget = new Widget({
+    private createPlayerListWidget(grid: GridContainer): void {
+        this.playerListWidget = new Widget({
             scene: this,
-            width: playerWidgetWidth,
-            height: CONFIG.PLAYER_BOX.H + 20,
+            width: Math.round(VIRTUAL.W * 0.9),
+            height: Math.round(VIRTUAL.H * 0.22),
+            cornerRadius: 20,
+            layout: 'vertical',
+            padding: 12
+        });
+        this.playerListWidget.addText("Players in Room", 32, '#ffffff');
+        grid.addItem(this.playerListWidget.getContainer(), { col: 0, row: 1 });
+    }
+
+    private createActionWidgets(grid: GridContainer): void {
+        this.createRoomButton = new HitboxWidget({ scene: this, width: 300, height: 80, cornerRadius: 15 });
+        this.createRoomButton.addText('Create Room', 28, '#ffffff');
+        this.createRoomButton.onClick(() => this.handleCreateRoom());
+        grid.addItem(this.createRoomButton.getContainer(), { col: 0, row: 2 });
+
+        this.startGameButton = new HitboxWidget({ scene: this, width: 300, height: 80, cornerRadius: 15 });
+        this.startGameButton.addText('Start Game', 28, '#ffffff');
+        this.startGameButton.onClick(() => this.handleStartGame());
+        grid.addItem(this.startGameButton.getContainer(), { col: 0, row: 2 });
+    }
+
+    private createMessageBox(grid: GridContainer): void {
+        const messageBox = new Widget({
+            scene: this,
+            width: Math.round(VIRTUAL.W * 0.9),
+            height: Math.round(VIRTUAL.H * 0.08),
             layout: 'horizontal',
+            padding: 8,
             backgroundAlpha: 0
         });
-        this.rootWidget.addItem(new WidgetItem(this.playerWidget));
+        this.messageText = messageBox.addText("Connecting to server...", 24, '#ffff00');
+        messageBox.getContainer().setDepth(99);
+        grid.addItem(messageBox.getContainer(), { col: 0, row: 3 });
     }
 
-    private updateUI() {
-        this.rebuildPlayerWidget();
-
-        if (this.activePromptItem) {
-            this.rootWidget.removeItem(this.activePromptItem);
-            this.activePromptItem.getObject().destroy();
-            this.activePromptItem = null;
-        }
-        if (this.activeButtonItem) {
-            this.rootWidget.removeItem(this.activeButtonItem);
-            (this.activeButtonItem.getWidget() as HitboxWidget).destroy();
-            this.activeButtonItem = null;
-        }
-
-        let button: HitboxWidget | null = null;
-
-        switch (this.phase) {
-            case 'add':
-                this.activePromptItem = this.rootWidget.addText('Select the number of players', 35, '#ffffff');
-                button = new HitboxWidget({ scene: this, width: 320, height: 56, backgroundColor: 0xffa500 });
-                button.addText('Roll for Position', 22, '#222');
-                button.onClick(this.handleRollForPosition);
-                button.setEnabled(this.players.length >= 2);
-                break;
-            case 'roll':
-                if (this.players[this.rollIndex]) {
-                    const name = this.players[this.rollIndex].name;
-                    this.activePromptItem = this.rootWidget.addText(`${name}: Roll two dice`, 35, '#ffffff');
-                }
-                button = new HitboxWidget({ scene: this, width: 170, height: 50 });
-                button.addText('Roll', 22, '#fff');
-                button.onClick(this.handleRollDice);
-                break;
-            case 'done':
-                if (this.players.length > 0) {
-                    this.activePromptItem = this.rootWidget.addText('All players have rolled!', 35, '#ffffff');
-                    button = new HitboxWidget({ scene: this, width: 260, height: 56, backgroundColor: 0x00b050 });
-                    button.addText('Start Game', 22, '#fff');
-                    button.onClick(this.handleStartGame);
-                }
-                break;
-        }
-
-        if (button) {
-            this.activeButtonItem = this.rootWidget.addItem(new WidgetItem(button)) as WidgetItem;
-        }
+    private updateUIForPhase(): void {
+        this.roomListWidget.getContainer().setVisible(this.phase === 'initial');
+        this.playerListWidget.getContainer().setVisible(this.phase === 'in-room');
+        this.createRoomButton.getContainer().setVisible(this.phase === 'initial');
+        this.startGameButton.getContainer().setVisible(this.phase === 'in-room' && this.network?.isHost === true);
     }
 
-    private rebuildPlayerWidget() {
-        this.playerWidget.removeAllItems();
-        this.players.forEach((player, i) => {
-            const box = this.makePlayerBox(player, i);
-            this.playerWidget.addItem(new WidgetItem(box));
-        });
-        if (this.phase === 'add' && this.players.length < CONFIG.MAX_PLAYERS) {
-            const addBox = this.makeAddBox();
-            this.playerWidget.addItem(new WidgetItem(addBox));
-        }
+    // ================================================================================================================
+    // NETWORK EVENT HANDLING
+    // ================================================================================================================
+
+    private setupNetworkEvents(): void {
+        EventBus.on('network-connected', this.handleNetworkConnected, this);
+        EventBus.on('network-roomList', this.updateRoomList, this);
+        EventBus.on('network-room-created', this.handleRoomCreated, this);
+        EventBus.on('network-joined-room', this.handleJoinedRoom, this);
+        EventBus.on('network-playerList', this.updatePlayerList, this);
+        EventBus.on('game-start', this.handleGameStart, this);
+        EventBus.on('network-error', this.handleNetworkError, this);
     }
 
-    private makePlayerBox(player: Player, index: number): Widget {
-        const box = new Widget({ scene: this, width: CONFIG.PLAYER_BOX.W, height: CONFIG.PLAYER_BOX.H, layout: 'vertical', padding: 12 });
-        let nameText = player.name;
-        if (this.phase !== 'add' && typeof player.roll === 'number') {
-            nameText += `\nRoll: ${player.roll}`;
-        }
-        box.addText(nameText, 18, '#ffffff');
-        const carKey = CONFIG.PALETTE.CARS[player.rollOrder ?? index % CONFIG.PALETTE.CARS.length];
-        if (this.textures.exists(carKey)) {
-            box.addImage(carKey, CONFIG.CAR_SCALE);
-        }
-        if (this.phase === 'add') {
-            const removeBtn = new HitboxWidget({ scene: this, width: 100, height: 34, backgroundColor: 0xb00 });
-            removeBtn.addText('Remove', 14, '#fff');
-            removeBtn.onClick(() => {
-                this.tweens.add({
-                    targets: box.getContainer(), scale: 0, alpha: 0, duration: 180, ease: 'Back.In',
-                    onComplete: () => this.handleRemovePlayer(player.id)
-                });
+    private handleNetworkConnected(): void {
+        this.messageText.setText('Successfully connected. Create or join a room.');
+    }
+
+    private updateRoomList(rooms: { name: string, playerCount: number }[]): void {
+        if (this.phase !== 'initial') return;
+        this.roomListWidget.removeAllItems();
+        this.roomListWidget.addText("Available Rooms", 32, '#ffffff');
+        if (rooms.length === 0) {
+            this.roomListWidget.addText("No rooms available. Why not create one?", 20, '#cccccc');
+        } else {
+            rooms.forEach(room => {
+                const roomItem = new HitboxWidget({ scene: this, width: 560, height: 60, cornerRadius: 10, layout: 'horizontal', padding: 15, backgroundAlpha: 0.3 });
+                roomItem.addText(`${room.name}`, 24, '#ffffff');
+                roomItem.addText(`(${room.playerCount}/6)`, 20, '#aaffaa');
+                roomItem.onClick(() => this.handleJoinRoom(room.name));
+                this.roomListWidget.addWidget(roomItem);
             });
-            box.addItem(new WidgetItem(removeBtn));
         }
-        return box;
     }
 
-    private makeAddBox(): Widget {
-        const box = new Widget({ scene: this, width: CONFIG.PLAYER_BOX.W, height: CONFIG.PLAYER_BOX.H, layout: 'vertical', padding: 8 });
-        box.addText('Add Player', 20, '#ffffff');
-        const addBtn = new HitboxWidget({ scene: this, width: 90, height: 90 });
-        addBtn.addText('+', 44, '#222');
-        addBtn.onClick(this.handleAddPlayer);
-        box.addItem(new WidgetItem(addBtn));
-        return box;
+    private handleRoomCreated(data: { roomName: string, players: { [id: string]: PlayerInfo } }): void {
+        this.roomName = data.roomName;
+        this.phase = 'in-room';
+        this.messageText.setText(`You are the host of room: ${this.roomName}`);
+        this.updateUIForPhase();
     }
 
-    private onResize = () => {
-        const rootContainer = this.rootWidget.getContainer();
-        const { width, height } = this.scale;
-        const { W, H } = CONFIG.VIRTUAL_DIMENSIONS;
-        const scale = Math.min(width / W, height / H);
-        rootContainer.setScale(scale);
-        rootContainer.setPosition((width - W * scale) / 2, (height - H * scale) / 2);
-    };
+    private handleJoinedRoom(data: { roomName: string }): void {
+        this.roomName = data.roomName;
+        this.phase = 'in-room';
+        this.messageText.setText(`You have joined room: ${this.roomName}`);
+        this.updateUIForPhase();
+    }
+
+    private updatePlayerList(players: PlayerInfo[]): void {
+        this.players = players;
+        if (this.phase !== 'in-room') return;
+
+        this.playerListWidget.removeAllItems();
+        this.playerListWidget.addText("Players in Room", 32, '#ffffff');
+
+        this.players.forEach((player) => {
+            const playerItem = new Widget({ scene: this, width: 560, height: 50, cornerRadius: 10, layout: 'horizontal', padding: 15, backgroundAlpha: 0.2 });
+            const isHost = this.players[0].id === player.id;
+            const playerName = player.name + (player.id === this.network.localPlayerId ? ' (You)' : '') + (isHost ? ' [Host]' : '');
+            playerItem.addText(playerName, 22, isHost ? '#ffff00' : '#ffffff');
+            this.playerListWidget.addWidget(playerItem);
+        });
+    }
+
+    private handleGameStart(data: { network: Network, players: { [id: string]: PlayerInfo } }): void {
+        this.scene.start('GameScene', data);
+    }
+
+    private handleNetworkError(message: string): void {
+        this.messageText.setText(`Error: ${message}`);
+        this.phase = 'initial';
+        this.updateUIForPhase();
+    }
+
+    // ================================================================================================================
+    // USER INTERACTION
+    // ================================================================================================================
+
+    private promptForPlayerName(): void {
+        const name = prompt("Please enter your name:");
+        if (name) {
+            this.playerName = name;
+        } else {
+            this.playerName = `Player${Math.floor(Math.random() * 1000)}`;
+        }
+    }
+
+    private handleCreateRoom(): void {
+        const roomName = prompt("Enter a name for your room:");
+        if (roomName) {
+            this.network.createRoom(roomName, this.playerName);
+        }
+    }
+
+    private handleJoinRoom(roomName: string): void {
+        this.network.joinRoom(roomName, this.playerName);
+    }
+
+    private handleStartGame(): void {
+        if (this.network.isHost) {
+            this.network.startGame(this.roomName);
+        }
+    }
 }

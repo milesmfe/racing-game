@@ -1,46 +1,25 @@
-import { defineConfig } from 'vite';
-import react from '@vitejs/plugin-react';
-
-const phasermsg = () => {
-    return {
-        name: 'phasermsg',
-        buildStart() {
-            process.stdout.write(`Building for production...\n`);
-        },
-        buildEnd() {
-            const line = "---------------------------------------------------------";
-            const msg = `❤️❤️❤️ Tell us about your game! - games@phaser.io ❤️❤️❤️`;
-            process.stdout.write(`${line}\n${msg}\n${line}\n`);
-
-            process.stdout.write(`✨ Done ✨\n`);
-        }
-    }
-}
+import { defineConfig } from "vite";
+import { nodePolyfills } from "vite-plugin-node-polyfills";
+import react from "@vitejs/plugin-react";
 
 export default defineConfig({
-    base: './',
     plugins: [
         react(),
-        phasermsg()
+        nodePolyfills({
+            protocolImports: true,
+        }),
     ],
-    logLevel: 'warning',
     build: {
+        outDir: "../dist",
+        emptyOutDir: true,
+        assetsInlineLimit: 0,
         rollupOptions: {
             output: {
-                manualChunks: {
-                    phaser: ['phaser']
-                }
-            }
-        },
-        minify: 'terser',
-        terserOptions: {
-            compress: {
-                passes: 2
+                entryFileNames: `assets/[name].js`,
+                chunkFileNames: `assets/[name].js`,
+                assetFileNames: `assets/[name].[ext]`,
             },
-            mangle: true,
-            format: {
-                comments: false
-            }
-        }
-    }
+        },
+    },
 });
+
