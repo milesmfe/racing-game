@@ -42,6 +42,8 @@ export class GameScene extends Scene {
     // ---------------------------------
     private players: NetworkPlayer[] = [];
     private numLaps: number = 3;
+    private finishedPlayerIds: string[] = [];
+    private lastPlayerId: string | null = null;
     private phase: Phase = 'waiting';
     private currentPlayerIndex: number = -1;
     private requiredSteps: number = 0;
@@ -144,6 +146,10 @@ export class GameScene extends Scene {
             player.currentSpeed = 0;
             this.players.push(player);
             if (info.isPlayer) playerIdx++;
+        }
+        const racingPlayers = this.players.filter(p => p.isPlayer);
+        if (racingPlayers.length > 0) {
+            this.lastPlayerId = racingPlayers[racingPlayers.length - 1].socketId;
         }
     }
 
@@ -332,6 +338,11 @@ export class GameScene extends Scene {
             return;
         }
 
+        if (this.currentPlayer?.socketId === this.lastPlayerId && this.finishedPlayerIds.length === racingPlayers.length) {
+            this.endRace();
+            return;
+        }
+
         let nextPlayerIndex = -1;
         if (this.currentPlayerIndex === -1) {
             nextPlayerIndex = this.players.findIndex(p => p.isPlayer);
@@ -426,8 +437,14 @@ export class GameScene extends Scene {
         if (this.stepSpaces.length > 0) {
             const finalPosition = this.stepSpaces[this.stepSpaces.length - 1];
 
-            if (this.didCrossFinishLine(player.currentPosition, finalPosition)) {
+            if (this.didCrossFinishLine()) {
                 player.lapsRemaining--;
+                if (player.lapsRemaining <= 0) {
+                    player.lapsRemaining = 0;
+                    if (!this.finishedPlayerIds.includes(player.socketId)) {
+                        this.finishedPlayerIds.push(player.socketId);
+                    }
+                }
             }
 
             const playerPitStop = this.pitStopMap[player.id];
@@ -460,6 +477,31 @@ export class GameScene extends Scene {
         }
 
         this.startTurn();
+    }
+
+    private endRace(): void {
+        this.phase = 'finished';
+
+        const finishedPlayers = this.players.filter(p => this.finishedPlayerIds.includes(p.socketId));
+
+        // if (finishedPlayers.length === 0) {
+        //     this.message.setText("Race over! No one finished.");
+        //     this.updateAndBroadcastState();
+        //     return;
+        // }
+
+        let winner = finishedPlayers[0];
+        let maxJ = -1;
+
+        for (const player of finishedPlayers) {
+            if (player.currentPosition.i === 0 && player.currentPosition.j > maxJ) {
+                winner = player;
+                maxJ = player.currentPosition.j;
+            }
+        }
+
+        this.message.setText(`${winner.name} wins!`);
+        this.updateAndBroadcastState();
     }
 
     // ================================================================================================================
@@ -851,8 +893,18 @@ export class GameScene extends Scene {
         return closest;
     }
 
-    private didCrossFinishLine(startPos: { i: number, j: number }, endPos: { i: number, j: number }): boolean {
-        return startPos.i > 0 && endPos.i === 0;
+    private didCrossFinishLine(): boolean {
+        const player = this.currentPlayer;
+        if (!player) return false;
+
+        let last_i = player.currentPosition.i;
+        for (const step of this.stepSpaces) {
+            if (step.i < last_i) {
+                return true;
+            }
+            last_i = step.i;
+        }
+        return false;
     }
 
     private trackImageToContainer(x: number, y: number): { x: number, y: number } {
