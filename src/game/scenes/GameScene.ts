@@ -507,9 +507,18 @@ export class GameScene extends Scene {
         this.message.setText(`Race finished! ${winner.name} wins!`);
         this.updateAndBroadcastState();
 
-        this.time.delayedCall(3000, () => {
-            this.scene.start('GameEndScene', { winner: winnerData, podiumPlayers: podiumData });
-        });
+        if (this.network && this.network.isHost) {
+            this.network.broadcastToPeers('gameEnd', { winner: winnerData, podiumPlayers: podiumData });
+
+            this.time.delayedCall(3000, () => {
+                this.network.broadcastToPeers('startScene', { scene: 'GameEndScene', data: { winner: winnerData, podiumPlayers: podiumData } });
+                this.scene.start('GameEndScene', { winner: winnerData, podiumPlayers: podiumData });
+            });
+        } else {
+            this.time.delayedCall(3000, () => {
+                this.scene.start('GameEndScene', { winner: winnerData, podiumPlayers: podiumData });
+            });
+        }
     }
 
     // ================================================================================================================
