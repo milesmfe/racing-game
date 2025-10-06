@@ -140,15 +140,8 @@ This command creates an optimized `dist` folder in the project root.
 Step 2: Run the Server
 
 ```
-# 1. Navigate to the server directory
-cd server
-
-# 2. Install dependencies (if you haven't already)
-npm install
-
-# 3. Start the production server
+# From the project's root directory, run the start script
 npm start
-
 ```
 
 The server will now be running at `http://localhost:3000`.
