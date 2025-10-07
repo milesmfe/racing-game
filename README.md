@@ -1,4 +1,4 @@
-# Formula One - Multiplayer Racing Game
+# Multiplayer Racing Game
 
 This project is a multiplayer, turn-based racing game inspired by classic board games, built with Phaser, React, and TypeScript. It features a peer-to-peer networking model using WebRTC for low-latency gameplay, supported by a Node.js signalling server for lobby management.
 
