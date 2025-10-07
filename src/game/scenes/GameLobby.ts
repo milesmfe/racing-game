@@ -110,7 +110,7 @@ export class GameLobby extends Scene {
 
     private createTitle(grid: GridContainer): void {
         const titleWidget = new Widget({ scene: this, width: VIRTUAL.W, height: VIRTUAL.H / 6, backgroundAlpha: 0 });
-        titleWidget.addText("Formula One", 64, '#ffffff');
+        titleWidget.addText("Racing Game", 64, '#ffffff');
         grid.addItem(titleWidget.getContainer(), { col: 0, row: 0 });
     }
 
