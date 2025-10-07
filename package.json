@@ -1,10 +1,10 @@
 {
-    "name": "formula-one-game",
-    "description": "A digital remake of Waddington's Formula 1 board game using Phaser 3, React, and TypeScript.",
-    "version": "1.0.0",
+    "name": "racing-game",
+    "description": "A digital remake of popular racing board game using Phaser 3, React, and TypeScript.",
+    "version": "1.0.0-alpha",
     "repository": {
         "type": "git",
-        "url": "git+https://github.com/milesmfe/formula-one-game.git"
+        "url": "git+https://github.com/milesmfe/racing-game.git"
     },
     "author": "Miles Edwards",
     "keywords": [
@@ -15,9 +15,7 @@
         "typescript",
         "racing",
         "game",
-        "boardgame",
-        "formulaone",
-        "f1"
+        "boardgame"
     ],
     "scripts": {
         "start": "node server/server.js",

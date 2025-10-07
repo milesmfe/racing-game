@@ -1,7 +1,7 @@
 {
-    "name": "formula-one-game-server",
+    "name": "racing-game-server",
     "version": "1.0.0",
-    "description": "Signalling server for the Formula One game",
+    "description": "Signalling server for the Racing Game",
     "main": "server.js",
     "scripts": {
         "start": "node server.js",
