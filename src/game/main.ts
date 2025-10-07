@@ -18,7 +18,7 @@ const config: Phaser.Types.Core.GameConfig = {
         createContainer: true,
     },
     scale: {
-        mode: Scale.FIT,
+        mode: Scale.EXPAND,
         autoCenter: Scale.CENTER_BOTH,
     },
     scene: [
