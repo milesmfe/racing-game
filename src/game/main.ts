@@ -8,6 +8,8 @@ import { GameEndScene } from './scenes/GameEndScene';
 const GAME_WIDTH = 1920;
 const GAME_HEIGHT = 1080;
 
+const isMobile = /Mobi|Android/i.test(navigator.userAgent);
+
 const config: Phaser.Types.Core.GameConfig = {
     type: AUTO,
     width: GAME_WIDTH,
@@ -18,7 +20,7 @@ const config: Phaser.Types.Core.GameConfig = {
         createContainer: true,
     },
     scale: {
-        mode: Scale.EXPAND,
+        mode: isMobile ? Scale.FIT : Scale.EXPAND,
         autoCenter: Scale.CENTER_BOTH,
     },
     scene: [
