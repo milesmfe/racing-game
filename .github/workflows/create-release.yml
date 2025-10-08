@@ -9,21 +9,24 @@ jobs:
     build-and-release:
         runs-on: ubuntu-latest
         steps:
+            # Checkout, Build, and Package
             - name: Checkout code
               uses: actions/checkout@v4
 
+            # Set up Node.js environment
             - name: Setup Node.js
               uses: actions/setup-node@v4
               with:
                   node-version: "20"
                   cache: "npm"
 
+            # Install dependencies and build the game
             - name: Install Root Dependencies
               run: npm ci
-
             - name: Build Phaser Game
               run: npm run build
 
+            # Build release package
             - name: Create Release Package
               run: |
                   mkdir release-package
@@ -31,13 +34,17 @@ jobs:
                   cp -r dist/ release-package/dist/
                   cd release-package/server
                   npm install --production
-
             - name: Create Zip Archive
               run: zip -r release.zip ./release-package
 
+            # Create GitHub Release
             - name: Create GitHub Release
               uses: softprops/action-gh-release@v2
               with:
                   name: Release ${{ github.ref_name }}
+                  tag_name: ${{ github.ref_name }}
+                  body: |
+                      ## Changes in this release
+                      **full changelog** [here](https://github.com/milesmfe/racing-game/commits/${{ github.sha }})
                   files: release.zip
 
