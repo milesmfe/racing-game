@@ -1,5 +1,8 @@
 name: Create Racing Game Release
 
+permissions:
+    contents: write
+
 on:
     push:
         tags:
@@ -47,4 +50,6 @@ jobs:
                       ## Changes in this release
                       **full changelog** [here](https://github.com/milesmfe/racing-game/commits/${{ github.sha }})
                   files: release.zip
+              env:
+                  GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
