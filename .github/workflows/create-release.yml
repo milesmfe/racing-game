@@ -1,0 +1,43 @@
+name: Create Racing Game Release
+
+on:
+    push:
+        tags:
+            - "v*.*.*"
+
+jobs:
+    build-and-release:
+        runs-on: ubuntu-latest
+        steps:
+            - name: Checkout code
+              uses: actions/checkout@v4
+
+            - name: Setup Node.js
+              uses: actions/setup-node@v4
+              with:
+                  node-version: "20"
+                  cache: "npm"
+
+            - name: Install Root Dependencies
+              run: npm ci
+
+            - name: Build Phaser Game
+              run: npm run build
+
+            - name: Create Release Package
+              run: |
+                  mkdir release-package
+                  cp -r server/ release-package/
+                  cp -r dist/ release-package/dist/
+                  cd release-package/server
+                  npm install --production
+
+            - name: Create Zip Archive
+              run: zip -r release.zip ./release-package
+
+            - name: Create GitHub Release
+              uses: softprops/action-gh-release@v2
+              with:
+                  name: Release ${{ github.ref_name }}
+                  files: release.zip
+
