@@ -47,3 +47,5 @@ jobs:
                       ## Changes in this release
                       **Full changelog:** [here](https://github.com/milesmfe/racing-game/compare/${{ github.ref.name }}...${{ github.sha }})
                   files: release.zip
+                  prerelease: ${{ endsWith(github.ref_name, '-alpha') || endsWith(github.ref_name, '-beta') }}
+
