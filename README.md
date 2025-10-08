@@ -1,4 +1,3 @@
-
 # A WebRTC Multiplayer Racing Game
 
 **Ready to Race? [Play the game live here!](https://itslightsoutandawaywego.co.uk/ "null")**
@@ -135,6 +134,48 @@ npm start
 
 The game is now live! Open `http://localhost:3000` in multiple browser tabs to play.
 
+## Automated Release & Deployment
+
+This project is configured with a Continuous Integration and Continuous Deployment (CI/CD) pipeline to automate the process of releasing new versions. Pushing a new version tag to the repository will automatically build, package, and deploy the game to the production server.
+
+### How It Works
+
+The automation is a two-part process:
+
+1. **GitHub Action (Release Creation)** : When a new tag following the pattern `v*.*.*` is pushed to the repository, a GitHub Action is triggered. This [action](https://github.com/milesmfe/racing-game/blob/main/.github/workflows/create-release.yml) performs the following steps:
+
+* Checks out the latest code.
+* Installs Node.js dependencies.
+* Builds the game for production (`npm run build`).
+* Packages the necessary server files (`server/`), the built game (`dist/`), and the server's production dependencies into a single `release.zip` file.
+* Creates a new public **GitHub Release** and attaches the `release.zip` file as an asset.
+
+1. **Webhook Deployment (Server-Side)** : The production server runs a lightweight webhook listener.
+
+* When the GitHub Action successfully creates a new release, GitHub sends a secure notification (a webhook) to a specific endpoint on the server.
+* The listener verifies the notification and executes a deploy script.
+* This script downloads the `release.zip` from the latest GitHub Release, unpacks it, and uses PM2 to reload the game server with zero downtime.
+
+### How to Deploy a New Version
+
+To release and deploy a new version of the game, follow these simple steps:
+
+1. Ensure all your latest changes have been committed and pushed to the `main` branch.
+2. From your local development machine, create a new Git tag with the desired version number. The version should follow [Semantic Versioning](https://semver.org/ "null").
+   ```
+   # Example for version 1.1.0
+   git tag v1.1.0
+
+   ```
+3. Push the new tag to the GitHub repository.
+   ```
+   # Push the specific tag to origin
+   git push origin v1.1.0
+
+   ```
+
+You can monitor the progress in **[Actions](https://github.com/milesmfe/racing-game/actions)**. Once the action is complete, the changes will be live on the server.
+
 ## Project Structure
 
 ```
@@ -157,7 +198,7 @@ The game is now live! Open `http://localhost:3000` in multiple browser tabs to p
 
 ## Contributions
 
-This project is still in development, any contributions are welcome and much appreciated! 
+This project is still in development, any contributions are welcome and much appreciated!
 
 * Please check the known [issues](https://github.com/milesmfe/racing-game/issues) before opening a pull request.
 * Development is currently focussed on improving the UI & UX.
