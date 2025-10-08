@@ -5,7 +5,7 @@
 
 Welcome to [redacted due to copyright] racing game, a multiplayer, turn-based racing game inspired by classic board games. This project is a deep dive into creating a real-time, browser-based gaming experience using a modern web stack. It's built from the ground up with **Phaser 3** for the game logic, **React** for rendering, and a peer-to-peer (P2P) networking model powered by **WebRTC** for low-latency gameplay.
 
-The core challenge this project tackles is state synchronization in a multiplayer environment without a powerful, authoritative game server, which is common in indie or hobbyist projects.
+The core challenge this project tackles is state synchronization in a multiplayer environment without a powerful, authoritative game server.
 
 ## Key Features
 
@@ -161,3 +161,4 @@ This project is still in development, any contributions are welcome and much app
 
 * Please check the known [issues](https://github.com/milesmfe/racing-game/issues) before opening a pull request.
 * Development is currently focussed on improving the UI & UX.
+
