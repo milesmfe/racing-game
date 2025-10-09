@@ -1,0 +1,22 @@
+name-template: "v$NEXT_PATCH_VERSION"
+tag-template: "v$NEXT_PATCH_VERSION"
+categories:
+    - title: "New Part Fitted (Feature Added)"
+      labels:
+          - "feature"
+          - "enhancement"
+    - title: "Gearbox Realignment (Bug Fixes)"
+      labels:
+          - "bug"
+          - "fix"
+    - title: "Pit Stop (Maintenance & Chores)"
+      labels:
+          - "chore"
+          - "documentation"
+          - "ci"
+template: |
+    ## What's Changed in This Release
+
+    $CHANGES
+
+    **Full Changelog**: https://github.com/$OWNER/$REPOSITORY/compare/$PREVIOUS_TAG...$TAG

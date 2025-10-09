@@ -3,6 +3,7 @@ name: Create Racing Game Release
 
 permissions:
     contents: write
+    pull-requests: read
 
 on:
     push:
@@ -40,18 +41,27 @@ jobs:
             - name: Create Zip Archive
               run: zip -r release.zip ./release-package
 
-            - name: Create GitHub Release
+            - name: Draft a new release with changelog
               id: create_release
-              uses: softprops/action-gh-release@v2
+              uses: release-drafter/release-drafter@v6
               with:
-                  name: Release ${{ github.ref_name }}
-                  body: |
-                      ## Changes in this release
-                      **Full changelog:** [here](https://github.com/milesmfe/racing-game/compare/${{ github.ref.name }}...${{ github.sha }})
-                  files: release.zip
+                  publish: true
                   prerelease: ${{ endsWith(github.ref_name, '-alpha') || endsWith(github.ref_name, '-beta') }}
+              env:
+                  GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+            - name: Upload Release Asset
+              uses: actions/upload-release-asset@v1
+              with:
+                  upload_url: ${{ steps.create_release.outputs.upload_url }}
+                  asset_path: ./release.zip
+                  asset_name: release.zip
+                  asset_content_type: application/zip
+              env:
+                  GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
             - name: Notify Deployment Server
+              if: success()
               run: |
                   # Construct the direct download URL for the asset
                   ASSET_URL="https://github.com/${{ github.repository }}/releases/download/${{ github.ref_name }}/release.zip"
@@ -62,3 +72,4 @@ jobs:
                   -H "X-Hook-Secret: ${{ secrets.WEBHOOK_SECRET }}" \
                   -d "{\"release_url\": \"$ASSET_URL\"}" \
                   "${{ secrets.WEBHOOK_URL }}"
+
