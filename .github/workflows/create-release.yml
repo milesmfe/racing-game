@@ -1,4 +1,3 @@
-# .github/workflows/create-release.yml
 name: Create Racing Game Release
 
 permissions:
