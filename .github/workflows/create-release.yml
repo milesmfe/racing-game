@@ -33,6 +33,7 @@ jobs:
                   mkdir release-package
                   cp -r server/ release-package/
                   cp -r dist/ release-package/dist/
+                  cp ecosystem.config.js release-package/
                   cd release-package/server
                   npm install --production
 
