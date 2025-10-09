@@ -3,17 +3,17 @@ tag-template: "v$NEXT_PATCH_VERSION"
 
 include-prereleases: true
 
-version-resolver:
-    major:
-        labels:
-            - "major"
-    minor:
-        labels:
-            - "minor"
-    patch:
-        labels:
-            - "patch"
-    default: patch
+# version-resolver:
+#     major:
+#         labels:
+#             - "major"
+#     minor:
+#         labels:
+#             - "minor"
+#     patch:
+#         labels:
+#             - "patch"
+#     default: patch
 
 categories:
     - title: "New Part Fitted (Feature Added)"
