@@ -1,5 +1,5 @@
 import { Boot } from './scenes/Boot';
-import { AUTO, Game, Scale } from 'phaser';
+import { AUTO, Game, Scale, Types } from 'phaser';
 import { Preloader } from './scenes/Preloader';
 import { GameLobby } from './scenes/GameLobby';
 import { GameScene } from './scenes/GameScene';
@@ -8,9 +8,7 @@ import { GameEndScene } from './scenes/GameEndScene';
 const GAME_WIDTH = 1920;
 const GAME_HEIGHT = 1080;
 
-const isMobile = /Mobi|Android/i.test(navigator.userAgent);
-
-const config: Phaser.Types.Core.GameConfig = {
+const config: Types.Core.GameConfig = {
     type: AUTO,
     width: GAME_WIDTH,
     height: GAME_HEIGHT,
@@ -20,7 +18,9 @@ const config: Phaser.Types.Core.GameConfig = {
         createContainer: true,
     },
     scale: {
-        mode: isMobile ? Scale.FIT : Scale.EXPAND,
+        mode: /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent)
+            ? Scale.FIT
+            : Scale.EXPAND,
         autoCenter: Scale.CENTER_BOTH,
     },
     scene: [
@@ -32,7 +32,7 @@ const config: Phaser.Types.Core.GameConfig = {
     ]
 };
 
-let game: Phaser.Game | null = null;
+let game: Game | null = null;
 
 const StartGame = (parent: string) => {
     game = new Game({ ...config, parent });
