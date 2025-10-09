@@ -40,6 +40,7 @@ jobs:
               run: zip -r release.zip ./release-package
 
             - name: Create GitHub Release
+              id: create_release
               uses: softprops/action-gh-release@v2
               with:
                   name: Release ${{ github.ref_name }}
@@ -49,3 +50,14 @@ jobs:
                   files: release.zip
                   prerelease: ${{ endsWith(github.ref_name, '-alpha') || endsWith(github.ref_name, '-beta') }}
 
+            - name: Notify Deployment Server
+              run: |
+                  # Construct the direct download URL for the asset
+                  ASSET_URL="https://github.com/${{ github.repository }}/releases/download/${{ github.ref_name }}/release.zip"
+
+                  # Send the URL to webhook endpoint
+                  curl -X POST \
+                  -H "Content-Type: application/json" \
+                  -H "X-Hook-Secret: ${{ secrets.WEBHOOK_SECRET }}" \
+                  -d "{\"release_url\": \"$ASSET_URL\"}" \
+                  "${{ secrets.WEBHOOK_URL }}"
