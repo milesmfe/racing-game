@@ -44,6 +44,8 @@ jobs:
               id: create_release
               uses: release-drafter/release-drafter@v6
               with:
+                  tag: ${{ github.ref_name }}
+                  name: Release ${{ github.ref_name }}
                   publish: true
                   prerelease: ${{ endsWith(github.ref_name, '-alpha') || endsWith(github.ref_name, '-beta') }}
               env:
