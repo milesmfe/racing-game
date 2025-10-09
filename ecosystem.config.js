@@ -1,6 +1,6 @@
 module.exports = {
   apps : [{
-    name   : "server",
+    name   : "racing-game",
     script : "./server/server.js",
     watch  : false,
     env: {
