@@ -20,7 +20,7 @@ const MAX_BRAKE_WEAR = 5;
 
 type Phase = 'speedselect' | 'moving' | 'penalty' | 'turn-over' | 'finished' | 'waiting';
 
-type NetworkPlayer = Player & { socketId: string, isPlayer: boolean };
+type NetworkPlayer = Player & { socketId: string, isPlayer: boolean, spunOff: boolean };
 
 type PlayerAction =
     | { type: 'selectSpeed', speed: number }
@@ -144,6 +144,7 @@ export class GameScene extends Scene {
             player.tyreWear = 0;
             player.lapsRemaining = this.numLaps;
             player.currentSpeed = 0;
+            player.spunOff = false;
             this.players.push(player);
             if (info.isPlayer) playerIdx++;
         }
@@ -363,7 +364,17 @@ export class GameScene extends Scene {
         }
 
         this.currentPlayerIndex = nextPlayerIndex;
-        this.phase = 'speedselect';
+        const player = this.currentPlayer!;
+        if (player.spunOff) {
+            player.spunOff = false;
+            player.currentSpeed = 60;
+            this.requiredSteps = player.currentSpeed / 20;
+            this.phase = 'moving';
+            this.availableSpaces = this.findSelectableSpaces(player.currentPosition, false);
+        } else {
+            this.phase = 'speedselect';
+        }
+
         this.updateAndBroadcastState();
     }
 
@@ -624,6 +635,7 @@ export class GameScene extends Scene {
     }
 
     private spinOff(player: NetworkPlayer, cornerPosition: { i: number, j: number }): void {
+        player.spunOff = true;
         player.currentSpeed = 0;
         const spinOffSpace = this.findNearestSpinOffSpace(cornerPosition);
         if (spinOffSpace) player.currentPosition = spinOffSpace;
