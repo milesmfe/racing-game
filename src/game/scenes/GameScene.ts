@@ -916,6 +916,7 @@ export class GameScene extends Scene {
         if (!player) return false;
 
         let last_i = player.currentPosition.i;
+        if (last_i === this.trackData.topography.length - 1) return true;
         for (const step of this.stepSpaces) {
             if (step.i < last_i) {
                 return true;
