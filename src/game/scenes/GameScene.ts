@@ -44,6 +44,7 @@ export class GameScene extends Scene {
     private numLaps: number = 3;
     private finishedPlayerIds: string[] = [];
     private lastPlayerId: string | null = null;
+    private raceOverTriggered: boolean = false;
     private phase: Phase = 'waiting';
     private currentPlayerIndex: number = -1;
     private requiredSteps: number = 0;
@@ -80,6 +81,7 @@ export class GameScene extends Scene {
     private tyreWearBar!: ProgressBarItem;
     private brakeWearBar!: ProgressBarItem;
     private lapText!: TextItem;
+    private lapTextLabel!: TextItem;
     private speedSelectorWidget!: HitboxWidget;
 
     // ---------------------------------
@@ -147,10 +149,6 @@ export class GameScene extends Scene {
             player.spunOff = false;
             this.players.push(player);
             if (info.isPlayer) playerIdx++;
-        }
-        const racingPlayers = this.players.filter(p => p.isPlayer);
-        if (racingPlayers.length > 0) {
-            this.lastPlayerId = racingPlayers[racingPlayers.length - 1].socketId;
         }
     }
 
@@ -290,6 +288,8 @@ export class GameScene extends Scene {
             die2Result: this.die2Result,
             stepSpaces: this.stepSpaces,
             availableSpaces: this.availableSpaces,
+            raceOverTriggered: this.raceOverTriggered,
+            lastPlayerId: this.lastPlayerId,
         };
 
         this.applyGameState(state);
@@ -312,6 +312,8 @@ export class GameScene extends Scene {
         this.die1Result = state.die1Result;
         this.die2Result = state.die2Result;
         this.availableSpaces = state.availableSpaces || [];
+        this.raceOverTriggered = state.raceOverTriggered;
+        this.lastPlayerId = state.lastPlayerId;
 
         this.players.forEach(p => {
             if (p.isPlayer) this.placePlayerOnTrack(p.id, p.currentPosition);
@@ -332,34 +334,26 @@ export class GameScene extends Scene {
     private startTurn(): void {
         if (!this.network.isHost) return;
 
-        const racingPlayers = this.players.filter(p => p.isPlayer);
-        if (racingPlayers.length === 0) {
-            this.phase = 'finished';
-            this.updateAndBroadcastState();
-            return;
-        }
-
-        if (this.currentPlayer?.socketId === this.lastPlayerId && this.finishedPlayerIds.length === racingPlayers.length) {
+        if (this.raceOverTriggered && this.currentPlayer?.socketId === this.lastPlayerId) {
             this.endRace();
             return;
         }
 
         let nextPlayerIndex = -1;
-        if (this.currentPlayerIndex === -1) {
-            nextPlayerIndex = this.players.findIndex(p => p.isPlayer);
-        } else {
-            for (let i = 1; i <= this.players.length; i++) {
-                const potentialNextIndex = (this.currentPlayerIndex + i) % this.players.length;
-                if (this.players[potentialNextIndex].isPlayer) {
-                    nextPlayerIndex = potentialNextIndex;
-                    break;
-                }
+        const startIndex = this.currentPlayerIndex === -1 ? this.players.length - 1 : this.currentPlayerIndex;
+
+        for (let i = 1; i <= this.players.length; i++) {
+            const potentialNextIndex = (startIndex + i) % this.players.length;
+            const potentialPlayer = this.players[potentialNextIndex];
+
+            if (potentialPlayer.isPlayer && potentialPlayer.lapsRemaining > 0) {
+                nextPlayerIndex = potentialNextIndex;
+                break;
             }
         }
 
         if (nextPlayerIndex === -1) {
-            this.phase = 'finished';
-            this.updateAndBroadcastState();
+            this.endRace();
             return;
         }
 
@@ -396,6 +390,13 @@ export class GameScene extends Scene {
 
         if (speedChange > 60) {
             this.message.setText("Invalid speed change. Please select another speed.");
+            this.phase = 'speedselect';
+            this.updateAndBroadcastState();
+            return;
+        }
+
+        if (player.tyreWear >= MAX_TYRE_WEAR && speedChange < -40) {
+            this.message.setText("Max tyre wear! You can only reduce speed by 40mph at most.");
             this.phase = 'speedselect';
             this.updateAndBroadcastState();
             return;
@@ -448,12 +449,22 @@ export class GameScene extends Scene {
         if (this.stepSpaces.length > 0) {
             const finalPosition = this.stepSpaces[this.stepSpaces.length - 1];
 
-            if (this.didCrossFinishLine()) {
+            if (player.lapsRemaining > 0 && this.didCrossFinishLine()) {
                 player.lapsRemaining--;
-                if (player.lapsRemaining <= 0) {
-                    player.lapsRemaining = 0;
+                if (player.lapsRemaining === 0) {
                     if (!this.finishedPlayerIds.includes(player.socketId)) {
                         this.finishedPlayerIds.push(player.socketId);
+                    }
+                    if (!this.raceOverTriggered) {
+                        this.raceOverTriggered = true;
+                        const racingPlayers = this.players.filter(p => p.isPlayer);
+                        const finisherIndexInRacingList = racingPlayers.findIndex(p => p.socketId === player.socketId);
+                        const lastPlayerIndex = (finisherIndexInRacingList - 1 + racingPlayers.length) % racingPlayers.length;
+                        this.lastPlayerId = racingPlayers[lastPlayerIndex].socketId;
+
+                        if (this.lastPlayerId === player.socketId) {
+                            this.lastPlayerId = racingPlayers[racingPlayers.length - 1].socketId;
+                        }
                     }
                 }
             }
@@ -495,27 +506,25 @@ export class GameScene extends Scene {
 
         const finishedPlayers = this.players.filter(p => this.finishedPlayerIds.includes(p.socketId));
 
-        // if (finishedPlayers.length === 0) {
-        //     this.message.setText("Race over! No one finished.");
-        //     this.updateAndBroadcastState();
-        //     return;
-        // }
+        const contenders = finishedPlayers.length > 0 ? finishedPlayers : this.players.filter(p => p.isPlayer);
 
-        finishedPlayers.sort((a, b) => {
-            if (a.currentPosition.i === 0 && b.currentPosition.i !== 0) return -1;
-            if (b.currentPosition.i === 0 && a.currentPosition.i !== 0) return 1;
-            if (a.currentPosition.i === 0 && b.currentPosition.i === 0) {
-                return b.currentPosition.j - a.currentPosition.j;
-            }
+        contenders.sort((a, b) => {
+            if (a.lapsRemaining < b.lapsRemaining) return -1;
+            if (b.lapsRemaining < a.lapsRemaining) return 1;
+            if (a.currentPosition.i < b.currentPosition.i) return -1;
+            if (b.currentPosition.i < a.currentPosition.i) return 1;
+            if (a.currentPosition.j > b.currentPosition.j) return -1;
+            if (b.currentPosition.j < a.currentPosition.j) return 1;
+
             return 0;
         });
 
-        const winner = finishedPlayers[0];
-        const podiumPlayers = finishedPlayers.slice(0, 3);
+        const winner = contenders[0];
+        const podiumPlayers = contenders.slice(0, 3);
         const podiumData = podiumPlayers.map(p => ({ id: p.id, name: p.name }));
-        const winnerData = { id: winner.id, name: winner.name };
+        const winnerData = winner ? { id: winner.id, name: winner.name } : null;
 
-        this.message.setText(`Race finished! ${winner.name} wins!`);
+        this.message.setText(winner ? `Race finished! ${winner.name} wins!` : "Race over!");
         this.updateAndBroadcastState();
 
         if (this.network && this.network.isHost) {
@@ -719,7 +728,8 @@ export class GameScene extends Scene {
         const localPlayer = this.players.find(p => p.socketId === this.localPlayerId);
 
         if (player) {
-            this.lapText.setText(`${this.numLaps - player.lapsRemaining + 1} / ${this.numLaps}`);
+            this.lapText.setText(`${player.lapsRemaining}`);
+            this.lapTextLabel.setText(`Lap${this.numLaps === 1 ? '' : 's'} to go`);
         }
         if (localPlayer) {
             this.tyreWearText.setText(`${localPlayer.tyreWear}`);
@@ -784,8 +794,8 @@ export class GameScene extends Scene {
 
     private createLapIndicator(grid: GridContainer): void {
         const lapIndicator = new Widget({ scene: this, width: 120, height: 120, cornerRadius: 20, layout: 'vertical', padding: 8 });
-        lapIndicator.addText('Lap', 18, '#ffffff');
-        this.lapText = lapIndicator.addText(`1 / ${this.numLaps}`, 28, '#ffff00');
+        this.lapText = lapIndicator.addText(`${this.numLaps}`, 28, '#ffff00');
+        this.lapTextLabel = lapIndicator.addText(`Lap${this.numLaps === 1 ? '' : 's'} to go`, 18, '#ffffff');
         grid.addItem(lapIndicator.getContainer(), { col: 3, row: 6, colSpan: 2, rowSpan: 2 });
     }
 
