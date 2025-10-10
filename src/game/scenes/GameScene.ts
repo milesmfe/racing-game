@@ -671,7 +671,8 @@ export class GameScene extends Scene {
             this.processNextCorner();
             return;
         }
-        if (excessSpeed >= 60 || player.tyreWear >= MAX_TYRE_WEAR) {
+
+        if (excessSpeed > 40 || player.tyreWear >= MAX_TYRE_WEAR) {
             this.spinOff(player, corner);
             return;
         }
