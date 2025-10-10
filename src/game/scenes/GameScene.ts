@@ -100,7 +100,7 @@ export class GameScene extends Scene {
     // Data Maps
     // ---------------------------------
     private startingPositionMap: Record<number, { i: number, j: number }> = {
-        0: { i: 60, j: 6 }, 1: { i: 60, j: 5 }, 2: { i: 0, j: 4 },
+        0: { i: 0, j: 6 }, 1: { i: 0, j: 5 }, 2: { i: 0, j: 4 },
         3: { i: 0, j: 3 }, 4: { i: 0, j: 2 }, 5: { i: 0, j: 1 }
     };
 
