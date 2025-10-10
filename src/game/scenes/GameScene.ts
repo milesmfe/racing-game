@@ -52,6 +52,8 @@ export class GameScene extends Scene {
     private die2Result: number | null = null;
     private cornerPenaltyContext: { player: NetworkPlayer, excessSpeed: number, corner: { i: number, j: number } } | null = null;
     private cornersToResolve: { i: number, j: number }[] = [];
+    private winnerData: { id: number, name: string } | null = null;
+    private podiumData: { id: number, name: string }[] = [];
 
     // ---------------------------------
     // Networking
@@ -98,7 +100,7 @@ export class GameScene extends Scene {
     // Data Maps
     // ---------------------------------
     private startingPositionMap: Record<number, { i: number, j: number }> = {
-        0: { i: 0, j: 6 }, 1: { i: 0, j: 5 }, 2: { i: 0, j: 4 },
+        0: { i: 60, j: 6 }, 1: { i: 60, j: 5 }, 2: { i: 0, j: 4 },
         3: { i: 0, j: 3 }, 4: { i: 0, j: 2 }, 5: { i: 0, j: 1 }
     };
 
@@ -279,7 +281,7 @@ export class GameScene extends Scene {
 
         const playersData = this.players.map(p => ({ ...p }));
 
-        const state = {
+        const state: any = {
             players: playersData,
             phase: this.phase,
             currentPlayerIndex: this.currentPlayerIndex,
@@ -292,11 +294,24 @@ export class GameScene extends Scene {
             lastPlayerId: this.lastPlayerId,
         };
 
+        if (this.phase === 'finished') {
+            state.winner = this.winnerData;
+            state.podiumPlayers = this.podiumData;
+        }
+
         this.applyGameState(state);
         this.network.broadcastToPeers('gameStateUpdate', state);
     }
 
     private applyGameState(state: any) {
+        if (state.phase === 'finished') {
+            this.phase = 'finished';
+            this.time.delayedCall(2000, () => {
+                this.scene.start('GameEndScene', { winner: state.winner, podiumPlayers: state.podiumPlayers });
+            });
+            return;
+        }
+
         if (state.players) {
             state.players.forEach((playerData: any) => {
                 const player = this.players.find(p => p.socketId === playerData.socketId);
@@ -502,42 +517,30 @@ export class GameScene extends Scene {
     }
 
     private endRace(): void {
+        if (this.phase === 'finished') return;
         this.phase = 'finished';
 
-        const finishedPlayers = this.players.filter(p => this.finishedPlayerIds.includes(p.socketId));
+        if (this.network.isHost) {
+            const finishedPlayers = this.players.filter(p => this.finishedPlayerIds.includes(p.socketId));
+            const contenders = finishedPlayers.length > 0 ? finishedPlayers : this.players.filter(p => p.isPlayer);
 
-        const contenders = finishedPlayers.length > 0 ? finishedPlayers : this.players.filter(p => p.isPlayer);
-
-        contenders.sort((a, b) => {
-            if (a.lapsRemaining < b.lapsRemaining) return -1;
-            if (b.lapsRemaining < a.lapsRemaining) return 1;
-            if (a.currentPosition.i < b.currentPosition.i) return -1;
-            if (b.currentPosition.i < a.currentPosition.i) return 1;
-            if (a.currentPosition.j > b.currentPosition.j) return -1;
-            if (b.currentPosition.j < a.currentPosition.j) return 1;
-
-            return 0;
-        });
-
-        const winner = contenders[0];
-        const podiumPlayers = contenders.slice(0, 3);
-        const podiumData = podiumPlayers.map(p => ({ id: p.id, name: p.name }));
-        const winnerData = winner ? { id: winner.id, name: winner.name } : null;
-
-        this.message.setText(winner ? `Race finished! ${winner.name} wins!` : "Race over!");
-        this.updateAndBroadcastState();
-
-        if (this.network && this.network.isHost) {
-            this.network.broadcastToPeers('gameEnd', { winner: winnerData, podiumPlayers: podiumData });
-
-            this.time.delayedCall(3000, () => {
-                this.network.broadcastToPeers('startScene', { scene: 'GameEndScene', data: { winner: winnerData, podiumPlayers: podiumData } });
-                this.scene.start('GameEndScene', { winner: winnerData, podiumPlayers: podiumData });
+            contenders.sort((a, b) => {
+                if (a.lapsRemaining < b.lapsRemaining) return -1;
+                if (b.lapsRemaining < a.lapsRemaining) return 1;
+                if (a.currentPosition.i < b.currentPosition.i) return -1;
+                if (b.currentPosition.i < a.currentPosition.i) return 1;
+                if (a.currentPosition.j > b.currentPosition.j) return -1;
+                if (b.currentPosition.j < a.currentPosition.j) return 1;
+                return 0;
             });
-        } else {
-            this.time.delayedCall(3000, () => {
-                this.scene.start('GameEndScene', { winner: winnerData, podiumPlayers: podiumData });
-            });
+
+            const winner = contenders[0];
+            const podiumPlayers = contenders.slice(0, 3);
+            this.podiumData = podiumPlayers.map(p => ({ id: p.id, name: p.name }));
+            this.winnerData = winner ? { id: winner.id, name: winner.name } : null;
+            this.message.setText(this.winnerData ? `Race finished! ${this.winnerData.name} wins!` : "Race over!");
+
+            this.updateAndBroadcastState();
         }
     }
 
