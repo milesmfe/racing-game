@@ -4,9 +4,14 @@ import { Widget } from '../layout/widgets';
 
 const VIRTUAL = { W: 1920, H: 1080 };
 
+interface PlayerResult {
+    id: number;
+    name: string;
+}
+
 export class GameEndScene extends Scene {
-    private winner!: { name: string, id: number };
-    private podiumPlayers!: { name: string, id: number }[];
+    private winner: PlayerResult | null = null;
+    private podiumPlayers: PlayerResult[] = [];
     private carPalette: string[] = ['yellow-car', 'orange-car', 'green-car', 'red-car', 'gray-car', 'purple-car'];
     private sceneContainer!: Phaser.GameObjects.Container;
 
@@ -14,9 +19,9 @@ export class GameEndScene extends Scene {
         super('GameEndScene');
     }
 
-    init(data: { winner: any, podiumPlayers: any[] }) {
+    init(data: { winner: PlayerResult | null, podiumPlayers: PlayerResult[] }) {
         this.winner = data.winner;
-        this.podiumPlayers = data.podiumPlayers;
+        this.podiumPlayers = data.podiumPlayers || [];
     }
 
     create() {
@@ -34,7 +39,8 @@ export class GameEndScene extends Scene {
         this.scale.on('resize', resizeContainer);
         const grid = new GridContainer({ scene: this, cols: 3, rows: 4, width: VIRTUAL.W, height: VIRTUAL.H });
         const titleWidget = new Widget({ scene: this, backgroundAlpha: 0, width: VIRTUAL.W, height: VIRTUAL.H / 4 });
-        titleWidget.addText(`Winner: ${this.winner.name}!`, 72, '#ffff00');
+        const titleText = this.winner ? `Winner: ${this.winner.name}!` : "Race Finished!";
+        titleWidget.addText(titleText, 72, '#ffff00');
         grid.addItem(titleWidget.getContainer(), { col: 0, row: 0, colSpan: 3, rowSpan: 1 });
         this.createPodium(grid);
         this.sceneContainer.add(grid);
@@ -47,7 +53,7 @@ export class GameEndScene extends Scene {
             { rank: 3, col: 2, row: 1, colSpan: 1, rowSpan: 3 }
         ];
 
-        const podiumHeights = { 1: 3 * VIRTUAL.H / 4, 2: VIRTUAL.H / 2, 3: VIRTUAL.H / 4 };
+        const podiumHeights: { [key: number]: number } = { 1: 3 * VIRTUAL.H / 4, 2: VIRTUAL.H / 2, 3: VIRTUAL.H / 4 };
 
         for (const layout of podiumLayout) {
             if (this.podiumPlayers.length < layout.rank) continue;
@@ -58,7 +64,7 @@ export class GameEndScene extends Scene {
             const podiumStep = new Widget({
                 scene: this,
                 width: VIRTUAL.W / 3,
-                height: podiumHeights[layout.rank as keyof typeof podiumHeights],
+                height: podiumHeights[layout.rank],
                 cornerRadius: 10,
                 layout: 'vertical',
                 padding: 16,
